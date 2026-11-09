@@ -1,6 +1,6 @@
 name: hermes-droid
 repo: https://github.com/dalroot/hermes-droid
-sha: c982ef1fe3555009b90d6c0d02b562dbc12b6a73
+sha: ca6042168ae7c5ddb8bc7359bb0fce4118ec490f
 subdir: plugin
 description: "Turn physical Android devices into automated hardware testbeds and QA companion nodes for Hermes Agent — wireless APK deployments, Logcat crash diagnostics, and screen captures."
 maintainer: dalroot
