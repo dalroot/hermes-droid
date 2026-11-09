@@ -7,6 +7,8 @@
 [![Platform: Android](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
 [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-%3E%3D0.19.0-purple.svg)](https://github.com/NousResearch/hermes-agent)
 [![Defense: Verified](https://img.shields.io/badge/Defense--in--Depth-v0.6.0%20Verified-blue.svg)](docs/SECURITY_AUDIT.md)
+[![Landing Page](https://img.shields.io/badge/Landing%20Page-Live%20Demo-0015ff.svg)](https://dalroot.github.io/hermes-droid/)
+[![CI Status](https://github.com/dalroot/hermes-droid/actions/workflows/ci.yml/badge.svg)](https://github.com/dalroot/hermes-droid/actions)
 
 ---
 
