@@ -1,3 +1,18 @@
+<p align="center">
+  <a href="https://nousresearch.com" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/img/nous-stamp-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/assets/img/nous-stamp.svg">
+      <img src="docs/assets/img/nous-stamp.svg" width="160" alt="Nous Research Seal - Rebellion to Tyrants is Obedience to God">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <em>"Rebellion to tyrants is obedience to God."</em><br>
+  <strong>Nous Research Hermes Agent Hackathon 2026 Submission</strong>
+</p>
+
 # 📱 Hermes Droid
 
 > **On-Device Physical Testbed & Autonomous QA Companion for Hermes Agent**  
@@ -22,6 +37,23 @@ While software emulators simulate basic Android runtime logic, they fail to repl
 2. **Live Visual QA & Diagnostics:** Stream real-time Logcat buffers (crash stack traces, ANRs), capture display framebuffers (1080x2340 on tested hardware) for visual regression verification, and inspect hardware vitals (battery, thermals, RAM).
 3. **Wireless Dev-Cycle (OTA Package Deployments):** Deploy freshly compiled APK builds over the network with mandatory SHA-256 integrity verification, signature matching, and PackageInstaller initiation — eliminating manual USB sideloading.
 4. **Developer ADB & Shell Interface:** Execute direct system shell commands, package management tasks, and dumpsys inspect routines through authenticated agent tool-calls.
+
+---
+
+## 🏛️ Nous Research Vision: The Physical Actuation Paradigm
+
+> *"Embodied Intelligence on Bare-Metal Silicon"*  
+> Hermes Agent was conceived to think, remember, and reason across digital environments. **Hermes Droid** completes the circle by extending sovereign open intelligence into the physical domain — transforming real Android hardware into autonomous sensory testbeds.
+
+<p align="center">
+  <img src="docs/assets/img/mission-duo-1.webp" width="48%" alt="Nous Research Cognition - The Cloud Mind" />
+  &nbsp;
+  <img src="docs/assets/img/mission-duo-2.webp" width="48%" alt="Hermes Droid Embodiment - Physical Silicon Actuation" />
+</p>
+
+<p align="center">
+  <sub><strong>Left:</strong> Sovereign Cloud & Desktop Cognition (Nous Hermes Agent) &nbsp;|&nbsp; <strong>Right:</strong> Autonomous Embodied Actuation on Physical Hardware (Hermes Droid)</sub>
+</p>
 
 ---
 

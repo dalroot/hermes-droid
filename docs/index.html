@@ -683,6 +683,10 @@
       .footer-container {
         grid-template-columns: 1fr 1fr;
       }
+      .mission-duo-grid {
+        grid-template-columns: 1fr;
+        gap: 36px;
+      }
     }
 
     @media (max-width: 640px) {
@@ -697,6 +701,244 @@
         gap: 16px;
         text-align: center;
       }
+    }
+
+    /* ==========================================================================
+       Nous Mission Section (Featuring Official Nous Artwork Duo)
+       ========================================================================== */
+    .mission-section {
+      padding: 120px 24px;
+      background: #02030a;
+      color: #ffffff;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mission-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0, 21, 255, 0.22) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+    }
+
+    .mission-header {
+      max-width: 860px;
+      margin: 0 auto 64px auto;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .mission-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #7b96ff;
+      background: rgba(0, 21, 255, 0.18);
+      border: 1px solid rgba(0, 21, 255, 0.45);
+      padding: 8px 18px;
+      border-radius: 9999px;
+      margin-bottom: 24px;
+    }
+
+    .mission-badge img {
+      width: 18px;
+      height: 18px;
+    }
+
+    .mission-title {
+      font-family: var(--font-serif);
+      font-size: clamp(34px, 4.5vw, 54px);
+      line-height: 1.1;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    .mission-subtext {
+      font-size: 17px;
+      line-height: 1.6;
+      color: #a0a6b8;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .mission-duo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .mission-duo-card {
+      background: #090c19;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mission-duo-card:hover {
+      border-color: rgba(0, 21, 255, 0.6);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 40px rgba(0, 21, 255, 0.18);
+    }
+
+    .mission-art-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 11;
+      overflow: hidden;
+      background: #000000;
+    }
+
+    .mission-duo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), filter 0.6s ease;
+      filter: contrast(1.1) brightness(0.95);
+    }
+
+    .mission-duo-card:hover .mission-duo-img {
+      transform: scale(1.04);
+      filter: contrast(1.15) brightness(1.02);
+    }
+
+    .mission-art-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0, 21, 255, 0.12) 0%, rgba(9, 12, 25, 0.85) 100%);
+      pointer-events: none;
+    }
+
+    .mission-art-tag {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: #ffffff;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      backdrop-filter: blur(8px);
+    }
+
+    .mission-card-content {
+      padding: 32px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mission-card-heading {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: 400;
+      color: #ffffff;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+
+    .mission-card-p {
+      font-size: 15px;
+      line-height: 1.65;
+      color: #9da3b4;
+    }
+
+    /* Hero Nous Stamp Emblem */
+    .hero-stamp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 8px 18px 8px 10px;
+      border-radius: 9999px;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+      text-decoration: none;
+    }
+
+    .hero-stamp-badge:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .hero-stamp-img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      padding: 3px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      transition: transform 0.8s ease;
+    }
+
+    .hero-stamp-badge:hover .hero-stamp-img {
+      transform: rotate(360deg);
+    }
+
+    .hero-stamp-info {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+
+    .hero-stamp-org {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .hero-stamp-motto {
+      font-size: 11px;
+      font-family: var(--font-serif);
+      font-style: italic;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    /* Footer Stamp */
+    .footer-stamp-block {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .footer-stamp-img {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #ffffff;
+      padding: 5px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
@@ -744,6 +986,14 @@
           <span class="pulse-dot"></span>
           <span>Nous Research Hermes Hackathon 2026 Submission</span>
         </div>
+
+        <a href="https://nousresearch.com" target="_blank" class="hero-stamp-badge" title="Nous Research: Rebellion to Tyrants is Obedience to God">
+          <img src="assets/img/nous-stamp.svg" alt="Nous Stamp" class="hero-stamp-img" />
+          <div class="hero-stamp-info">
+            <span class="hero-stamp-org">NOUS RESEARCH</span>
+            <span class="hero-stamp-motto">Rebellion to Tyrants is Obedience to God</span>
+          </div>
+        </a>
 
         <h1 class="hero-title">
           The Physical Node<br />
@@ -1002,6 +1252,52 @@
     </div>
   </section>
 
+  <!-- Section: Nous Mission & Physical Actuation (Featuring Official Nous Artwork) -->
+  <section class="mission-section">
+    <div class="section-container">
+      <div class="mission-header">
+        <div class="mission-badge">
+          <img src="assets/img/nous-stamp.svg" width="18" height="18" alt="" style="border-radius:50%; background:#fff; padding:2px;" />
+          <span>NOUS RESEARCH PARADIGM</span>
+        </div>
+        <h2 class="mission-title">From Cloud Cognition to Bare-Metal Reality</h2>
+        <p class="mission-subtext">
+          Hermes Agent was conceived to think, remember, and adapt across every digital workspace. Hermes Droid gives it hands, eyes, and physical actuation directly on Android silicon.
+        </p>
+      </div>
+
+      <div class="mission-duo-grid">
+        <div class="mission-duo-card">
+          <div class="mission-art-wrapper">
+            <img src="assets/img/mission-duo-1.webp" alt="Cognition in the Cloud - Nous Research" class="mission-duo-img" />
+            <div class="mission-art-overlay"></div>
+            <div class="mission-art-tag">01 / COGNITION</div>
+          </div>
+          <div class="mission-card-content">
+            <h3 class="mission-card-heading">The Sovereign Mind</h3>
+            <p class="mission-card-p">
+              Multi-model reasoning engines, persistent memory, and autonomous skill generation operating seamlessly across cloud and local workstations.
+            </p>
+          </div>
+        </div>
+
+        <div class="mission-duo-card">
+          <div class="mission-art-wrapper">
+            <img src="assets/img/mission-duo-2.webp" alt="Actuation on Physical Silicon - Hermes Droid" class="mission-duo-img" />
+            <div class="mission-art-overlay"></div>
+            <div class="mission-art-tag">02 / EMBODIMENT</div>
+          </div>
+          <div class="mission-card-content">
+            <h3 class="mission-card-heading">The Physical Node</h3>
+            <p class="mission-card-p">
+              Real display framebuffers, physical touch actuation, thermal monitoring, hardware radio states, and zero-emulator truth on Android silicon.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Section 3: Interactive Live Terminal Simulator -->
   <section class="demo-section">
     <div class="demo-header">
@@ -1095,6 +1391,11 @@
   <footer class="footer">
     <div class="footer-container">
       <div>
+        <div class="footer-stamp-block">
+          <a href="https://nousresearch.com" target="_blank" title="Nous Research: Rebellion to Tyrants is Obedience to God">
+            <img src="assets/img/nous-stamp.svg" alt="Nous Stamp" class="footer-stamp-img" />
+          </a>
+        </div>
         <div class="footer-logo-title">Hermes Droid</div>
         <p class="footer-desc">
           Autonomous physical hardware testbed & mobile QA companion for Nous Research Hermes Agent.
