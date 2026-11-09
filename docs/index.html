@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes Droid — Autonomous Physical Testbed & Mobile QA Companion for Hermes Agent</title>
+  <meta name="description" content="Transform physical Android hardware into an autonomous testbed, mobile QA workstation, and sensory companion for Nous Research Hermes Agent." />
+  
+  <!-- Open Graph / Meta -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://dalroot.github.io/hermes-droid/" />
+  <meta property="og:title" content="Hermes Droid — Physical Testbed for Hermes Agent" />
+  <meta property="og:description" content="Autonomous mobile QA, wireless OTA APK deployment, Logcat crash analytics, and sensory telemetry on real Android silicon." />
+  <meta property="twitter:card" content="summary_large_image" />
+
+  <!-- Fonts: Instrument Serif & Playfair for the iconic Nous typography, Inter for UI, JetBrains Mono for terminal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --cobalt-primary: #0015ff;
+      --cobalt-deep: #000fc7;
+      --cobalt-darker: #00086e;
+      --cobalt-navy: #050a30;
+      --cobalt-tint: #eaf0ff;
+      --cobalt-border: rgba(255, 255, 255, 0.2);
+      --text-white: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.78);
+      --bg-light: #ffffff;
+      --bg-offwhite: #f7f8fc;
+      --text-dark: #070d38;
+      --text-body: #495470;
+      --border-light: #e2e6f0;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-light);
+      color: var(--text-dark);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    /* Top Sticky Navigation Bar (Matching Screenshot 2) */
+    .top-nav {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-light);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.94);
+    }
+
+    .nav-container {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-left, .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #63718c;
+      transition: color 0.15s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--cobalt-primary);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-logo svg {
+      width: 44px;
+      height: 28px;
+      fill: var(--cobalt-primary);
+    }
+
+    .nav-badge-pill {
+      background: var(--cobalt-primary);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-badge-pill:hover {
+      background: var(--cobalt-deep);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0, 21, 255, 0.25);
+    }
+
+    /* Hero Section - Iconic Cobalt Electric Blue (Matching Screenshot 1) */
+    .hero-section {
+      background-color: var(--cobalt-primary);
+      color: var(--text-white);
+      position: relative;
+      padding: 72px 32px 100px;
+      overflow: hidden;
+    }
+
+    .hero-container {
+      max-width: 1380px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 56px;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hackathon-ribbon {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      backdrop-filter: blur(8px);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #55ff77;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #55ff77;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: clamp(64px, 7.5vw, 102px);
+      line-height: 0.95;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      margin-bottom: 28px;
+      text-wrap: balance;
+    }
+
+    .hero-desc {
+      font-size: clamp(17px, 1.8vw, 21px);
+      color: var(--text-muted);
+      max-width: 620px;
+      line-height: 1.5;
+      margin-bottom: 40px;
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .btn-pill-white {
+      background: #ffffff;
+      color: var(--cobalt-primary);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 16px 30px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .btn-pill-white:hover {
+      background: #f0f3ff;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-pill-ghost {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 16px 28px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .btn-pill-ghost:hover {
+      background: rgba(255, 255, 255, 0.24);
+      border-color: rgba(255, 255, 255, 0.6);
+      transform: translateY(-2px);
+    }
+
+    /* Terminal Box in Hero */
+    .terminal-wrapper {
+      max-width: 580px;
+    }
+
+    .terminal-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 10px;
+    }
+
+    .terminal-box {
+      background: #000c8f;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .terminal-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .terminal-tab {
+      padding: 10px 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.55);
+      cursor: pointer;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .terminal-tab.active {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+      font-weight: 600;
+    }
+
+    .terminal-body {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .terminal-code {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .terminal-copy-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      transition: all 0.15s ease;
+    }
+
+    .terminal-copy-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Classical Engraving Illustration in Hero (Exact Nous Aesthetic) */
+    .hero-art-col {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    .art-frame {
+      width: 100%;
+      max-width: 500px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: radial-gradient(circle at center, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+    }
+
+    .engraving-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Section 2: 3-Pillar Classical Cards (Matching Screenshot 2) */
+    .pillars-section {
+      padding: 100px 32px 110px;
+      background: #ffffff;
+    }
+
+    .section-container {
+      max-width: 1380px;
+      margin: 0 auto;
+    }
+
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 36px;
+    }
+
+    .pillar-card {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--border-light);
+      padding-top: 28px;
+    }
+
+    .pillar-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cobalt-primary);
+      margin-bottom: 12px;
+    }
+
+    .pillar-title {
+      font-family: var(--font-serif);
+      font-size: clamp(34px, 3.2vw, 44px);
+      line-height: 1.05;
+      font-weight: 400;
+      color: var(--text-dark);
+      margin-bottom: 16px;
+    }
+
+    .pillar-desc {
+      font-size: 16px;
+      color: var(--text-body);
+      line-height: 1.6;
+      margin-bottom: 32px;
+      flex-grow: 1;
+    }
+
+    .pillar-image-container {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #0015ff;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Live Interactive Terminal Simulator */
+    .demo-section {
+      background: var(--bg-offwhite);
+      padding: 100px 32px;
+      border-top: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .demo-header {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 54px;
+    }
+
+    .demo-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cobalt-primary);
+      margin-bottom: 12px;
+    }
+
+    .demo-headline {
+      font-family: var(--font-serif);
+      font-size: clamp(38px, 4.5vw, 56px);
+      line-height: 1.05;
+      color: var(--text-dark);
+      margin-bottom: 18px;
+    }
+
+    .demo-subtext {
+      font-size: 17px;
+      color: var(--text-body);
+      line-height: 1.6;
+    }
+
+    .interactive-console {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #06091d;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(6, 12, 45, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .console-bar {
+      background: #0b1130;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .console-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .console-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+
+    .console-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.05em;
+    }
+
+    .tool-selector-bar {
+      background: #0e153d;
+      padding: 10px 20px;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tool-btn {
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .tool-btn:hover, .tool-btn.active {
+      background: var(--cobalt-primary);
+      color: #ffffff;
+      border-color: var(--cobalt-primary);
+    }
+
+    .console-screen {
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      color: #e2e8f0;
+      min-height: 260px;
+      max-height: 420px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-line {
+      margin-bottom: 6px;
+    }
+
+    .log-dim { color: #64748b; }
+    .log-cyan { color: #38bdf8; }
+    .log-green { color: #4ade80; }
+    .log-yellow { color: #facc15; }
+    .log-purple { color: #c084fc; }
+
+    /* Security & Hardening Section */
+    .security-section {
+      padding: 100px 32px;
+      background: #ffffff;
+    }
+
+    .sec-card {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, #020726 0%, #0015ff 100%);
+      color: #ffffff;
+      border-radius: 20px;
+      padding: 64px 54px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      box-shadow: 0 20px 50px rgba(0, 21, 255, 0.2);
+    }
+
+    .sec-title {
+      font-family: var(--font-serif);
+      font-size: clamp(36px, 4vw, 50px);
+      line-height: 1.05;
+      margin-bottom: 18px;
+    }
+
+    .sec-desc {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .sec-checklist {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sec-check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14.5px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .sec-check-icon {
+      color: #55ff77;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* Footer */
+    .footer {
+      background: #050a26;
+      color: rgba(255, 255, 255, 0.65);
+      padding: 80px 32px 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .footer-container {
+      max-width: 1380px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 64px;
+    }
+
+    .footer-logo-title {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      color: #ffffff;
+      margin-bottom: 12px;
+    }
+
+    .footer-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 360px;
+    }
+
+    .footer-col h4 {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 20px;
+      font-weight: 700;
+    }
+
+    .footer-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .footer-links a:hover {
+      color: #ffffff;
+    }
+
+    .footer-bottom {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding-top: 32px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hero-container {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      .pillars-grid {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      .sec-card {
+        grid-template-columns: 1fr;
+        padding: 40px 28px;
+      }
+      .footer-container {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .nav-left .nav-link {
+        display: none;
+      }
+      .footer-container {
+        grid-template-columns: 1fr;
+      }
+      .footer-bottom {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Sticky Navigation Bar (Matching Nous Hermes Screenshot 2) -->
+  <header class="top-nav">
+    <div class="nav-container">
+      <div class="nav-left">
+        <a href="https://nousresearch.com" target="_blank" class="nav-link">NOUS</a>
+        <a href="#" class="nav-link" style="color: var(--cobalt-primary); font-weight: 700;">HERMES DROID</a>
+        <a href="https://github.com/dalroot/hermes-droid" target="_blank" class="nav-link">GITHUB</a>
+      </div>
+
+      <!-- Hermes Winged Helmet Logo Icon -->
+      <a href="#" class="nav-logo" title="Hermes Droid">
+        <svg viewBox="0 0 100 64" xmlns="http://www.w3.org/2000/svg">
+          <!-- Stylized Hermes Winged Emblem -->
+          <path d="M10,32 Q25,10 50,18 Q75,10 90,32 Q65,24 50,38 Q35,24 10,32 Z" opacity="0.95"/>
+          <path d="M22,35 C32,22 68,22 78,35 C64,28 36,28 22,35 Z" fill="#ffffff" opacity="0.8"/>
+          <path d="M5,26 Q30,4 50,14 Q70,4 95,26 Q68,16 50,28 Q32,16 5,26 Z" opacity="0.4"/>
+          <path d="M38,36 L50,56 L62,36 Z"/>
+        </svg>
+      </a>
+
+      <div class="nav-right">
+        <a href="https://github.com/dalroot/hermes-droid/blob/main/docs/SECURITY_AUDIT.md" target="_blank" class="nav-link">AUDIT REPORT</a>
+        <a href="https://github.com/NousResearch/hermes-agent" target="_blank" class="nav-link">HERMES AGENT</a>
+        <a href="https://github.com/dalroot/hermes-droid/releases/tag/v0.6.0-security-hardened" target="_blank" class="nav-badge-pill">
+          <span>INSTALL DROID</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="7" y1="17" x2="17" y2="7"></line>
+            <polyline points="7 7 17 7 17 17"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section: Vibrant Cobalt Electric Blue (Matching Nous Hermes Screenshot 1) -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hackathon-ribbon">
+          <span class="pulse-dot"></span>
+          <span>Nous Research Hermes Hackathon 2026 Submission</span>
+        </div>
+
+        <h1 class="hero-title">
+          The Physical Node<br />
+          That Acts In The<br />
+          Real World
+        </h1>
+
+        <p class="hero-desc">
+          Transform real physical Android devices into automated hardware testbeds, mobile QA workstations, and embodied sensory companions for Hermes Agent.
+        </p>
+
+        <div class="hero-actions">
+          <a href="https://github.com/dalroot/hermes-droid/releases/download/v0.6.0-security-hardened/app-release.apk" class="btn-pill-white">
+            <span>DOWNLOAD APK (v0.6.0)</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </a>
+
+          <a href="https://github.com/dalroot/hermes-droid" target="_blank" class="btn-pill-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            <span>VIEW ON GITHUB</span>
+          </a>
+        </div>
+
+        <!-- Terminal Install Box (Matching Screenshot 1) -->
+        <div class="terminal-wrapper">
+          <div class="terminal-label">INSTALL VIA TERMINAL</div>
+          <div class="terminal-box">
+            <div class="terminal-tabs">
+              <div class="terminal-tab active" onclick="switchTab('plugin', this)">Plugin CLI</div>
+              <div class="terminal-tab" onclick="switchTab('pair', this)">Quick Pair</div>
+              <div class="terminal-tab" onclick="switchTab('clone', this)">Manual Clone</div>
+            </div>
+            <div class="terminal-body">
+              <code class="terminal-code" id="terminal-snippet">hermes plugins install hermes-droid</code>
+              <button class="terminal-copy-btn" onclick="copySnippet()" title="Copy command">
+                <svg id="copy-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Classical Stippled Engraving Artwork (Nous Style) -->
+      <div class="hero-art-col">
+        <div class="art-frame">
+          <svg class="engraving-canvas" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="burstGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+                <stop offset="60%" stop-color="#ffffff" stop-opacity="0.08"/>
+                <stop offset="100%" stop-color="#0015ff" stop-opacity="0"/>
+              </radialGradient>
+              <pattern id="stipplePattern" width="4" height="4" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="0.75" fill="#ffffff" fill-opacity="0.6"/>
+              </pattern>
+            </defs>
+
+            <!-- Radiating Celestial Engraving Rays -->
+            <g stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8">
+              <!-- Circular rays emanated from center -->
+              <line x1="250" y1="250" x2="30" y2="40" />
+              <line x1="250" y1="250" x2="70" y2="15" />
+              <line x1="250" y1="250" x2="120" y2="5" />
+              <line x1="250" y1="250" x2="180" y2="2" />
+              <line x1="250" y1="250" x2="250" y2="0" stroke-width="1.2" stroke-opacity="0.7" />
+              <line x1="250" y1="250" x2="320" y2="2" />
+              <line x1="250" y1="250" x2="380" y2="5" />
+              <line x1="250" y1="250" x2="430" y2="15" />
+              <line x1="250" y1="250" x2="470" y2="40" />
+
+              <line x1="250" y1="250" x2="495" y2="100" />
+              <line x1="250" y1="250" x2="500" y2="160" />
+              <line x1="250" y1="250" x2="498" y2="220" />
+              <line x1="250" y1="250" x2="490" y2="280" />
+              <line x1="250" y1="250" x2="470" y2="340" />
+              <line x1="250" y1="250" x2="435" y2="400" />
+              <line x1="250" y1="250" x2="390" y2="450" />
+              <line x1="250" y1="250" x2="330" y2="485" />
+              <line x1="250" y1="250" x2="250" y2="500" stroke-width="1.2" stroke-opacity="0.7" />
+
+              <line x1="250" y1="250" x2="170" y2="485" />
+              <line x1="250" y1="250" x2="110" y2="450" />
+              <line x1="250" y1="250" x2="65" y2="400" />
+              <line x1="250" y1="250" x2="30" y2="340" />
+              <line x1="250" y1="250" x2="10" y2="280" />
+              <line x1="250" y1="250" x2="2" y2="220" />
+              <line x1="250" y1="250" x2="0" y2="160" />
+              <line x1="250" y1="250" x2="5" y2="100" />
+            </g>
+
+            <!-- Radiating Concentric Engraving Rings -->
+            <circle cx="250" cy="250" r="80" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="3,3" stroke-opacity="0.5"/>
+            <circle cx="250" cy="250" r="140" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.35"/>
+            <circle cx="250" cy="250" r="200" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="2,4" stroke-opacity="0.3"/>
+            <circle cx="250" cy="250" r="240" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.2"/>
+
+            <!-- Center Halo -->
+            <circle cx="250" cy="250" r="130" fill="url(#burstGlow)"/>
+
+            <!-- Detailed Classical Engraving: Winged Android Caduceus & Physical Node Motif -->
+            <g transform="translate(0, -10)">
+              <!-- Wing Left (Stippled feather layers) -->
+              <path d="M250,220 C200,160 120,130 60,180 C100,210 160,225 210,240 Z" fill="#ffffff" fill-opacity="0.15" stroke="#ffffff" stroke-width="1.4"/>
+              <path d="M240,225 C190,185 130,170 80,215 C120,230 170,245 220,250 Z" stroke="#ffffff" stroke-width="1" stroke-opacity="0.8"/>
+              <path d="M230,235 C190,205 145,200 100,240 C140,250 185,260 225,260 Z" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.6"/>
+
+              <!-- Wing Right (Stippled feather layers) -->
+              <path d="M250,220 C300,160 380,130 440,180 C400,210 340,225 290,240 Z" fill="#ffffff" fill-opacity="0.15" stroke="#ffffff" stroke-width="1.4"/>
+              <path d="M260,225 C310,185 370,170 420,215 C380,230 330,245 280,250 Z" stroke="#ffffff" stroke-width="1" stroke-opacity="0.8"/>
+              <path d="M270,235 C310,205 355,200 400,240 C360,250 315,260 275,260 Z" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.6"/>
+
+              <!-- Central Mobile Node Device Frame (Physical Silicon Monolith) -->
+              <rect x="205" y="150" width="90" height="175" rx="14" fill="#0012db" stroke="#ffffff" stroke-width="2.2"/>
+              <rect x="213" y="166" width="74" height="140" rx="6" fill="#00096b" stroke="#ffffff" stroke-width="1" stroke-opacity="0.8"/>
+
+              <!-- Screen Circuitry & Classical Stipple Hatching -->
+              <line x1="225" y1="185" x2="275" y2="185" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.9"/>
+              <line x1="225" y1="195" x2="260" y2="195" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.6"/>
+              <circle cx="250" cy="235" r="22" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4,2"/>
+              <circle cx="250" cy="235" r="8" fill="#ffffff"/>
+
+              <!-- Antenna & Radio Wave Nodes -->
+              <line x1="230" y1="150" x2="220" y2="125" stroke="#ffffff" stroke-width="1.8"/>
+              <circle cx="220" cy="125" r="3.5" fill="#ffffff"/>
+              <line x1="270" y1="150" x2="280" y2="125" stroke="#ffffff" stroke-width="1.8"/>
+              <circle cx="280" cy="125" r="3.5" fill="#ffffff"/>
+
+              <!-- Device Speaker & Home Pill -->
+              <line x1="242" y1="158" x2="258" y2="158" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="240" y1="316" x2="260" y2="316" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-opacity="0.8"/>
+
+              <!-- Intertwined Caduceus Telemetry Ribbons -->
+              <path d="M220,335 C200,365 240,390 250,405 C260,390 300,365 280,335" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+              <path d="M230,355 C215,385 245,410 250,425 C255,410 285,385 270,355" stroke="#ffffff" stroke-width="1" stroke-opacity="0.7" fill="none"/>
+              <circle cx="250" cy="430" r="4" fill="#ffffff"/>
+            </g>
+
+            <!-- Classical Stippled Frame Border -->
+            <rect x="25" y="25" width="450" height="450" stroke="#ffffff" stroke-width="1" stroke-opacity="0.4" fill="none"/>
+            <rect x="33" y="33" width="434" height="434" stroke="#ffffff" stroke-width="0.5" stroke-dasharray="2,3" stroke-opacity="0.3" fill="none"/>
+            <!-- Corner Accents -->
+            <polygon points="25,25 45,25 25,45" fill="#ffffff" fill-opacity="0.5"/>
+            <polygon points="475,25 455,25 475,45" fill="#ffffff" fill-opacity="0.5"/>
+            <polygon points="25,475 45,475 25,455" fill="#ffffff" fill-opacity="0.5"/>
+            <polygon points="475,475 455,475 475,455" fill="#ffffff" fill-opacity="0.5"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: 3-Pillar Classical Cards (Matching Nous Hermes Screenshot 2) -->
+  <section class="pillars-section">
+    <div class="section-container">
+      <div class="pillars-grid">
+        
+        <!-- Pillar #1 -->
+        <div class="pillar-card">
+          <div class="pillar-tag">#1 REAL HARDWARE</div>
+          <h2 class="pillar-title">Zero Emulator Illusions</h2>
+          <p class="pillar-desc">
+            Emulators mask vendor-specific GPU driver panics, thermal throttling, real battery drain, and radio handoffs. Hermes Droid runs directly on physical Android silicon.
+          </p>
+          <div class="pillar-image-container">
+            <svg viewBox="0 0 360 360" width="100%" height="100%">
+              <!-- Blue Halftone Scan Art -->
+              <rect width="360" height="360" fill="#0015ff"/>
+              <g stroke="#ffffff" stroke-width="0.75" stroke-opacity="0.4">
+                <line x1="0" y1="40" x2="360" y2="40"/><line x1="0" y1="80" x2="360" y2="80"/>
+                <line x1="0" y1="120" x2="360" y2="120"/><line x1="0" y1="160" x2="360" y2="160"/>
+                <line x1="0" y1="200" x2="360" y2="200"/><line x1="0" y1="240" x2="360" y2="240"/>
+                <line x1="0" y1="280" x2="360" y2="280"/><line x1="0" y1="320" x2="360" y2="320"/>
+              </g>
+              <!-- Classical Engraving Face / Silicon Vision Motif -->
+              <circle cx="180" cy="180" r="95" stroke="#ffffff" stroke-width="1.8" stroke-dasharray="3,3"/>
+              <circle cx="180" cy="180" r="65" stroke="#ffffff" stroke-width="1.2"/>
+              <path d="M110,180 Q180,110 250,180 Q180,250 110,180 Z" stroke="#ffffff" stroke-width="2" fill="none"/>
+              <circle cx="180" cy="180" r="24" fill="#ffffff" fill-opacity="0.9"/>
+              <circle cx="180" cy="180" r="10" fill="#0015ff"/>
+              <g stroke="#ffffff" stroke-width="1">
+                <line x1="180" y1="70" x2="180" y2="115"/>
+                <line x1="180" y1="245" x2="180" y2="290"/>
+                <line x1="70" y1="180" x2="110" y2="180"/>
+                <line x1="250" y1="180" x2="290" y2="180"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Pillar #2 -->
+        <div class="pillar-card">
+          <div class="pillar-tag">#2 SECURE OTA</div>
+          <h2 class="pillar-title">Cryptographic Pipeline</h2>
+          <p class="pillar-desc">
+            Deploy freshly compiled APKs over the air. Every package update is enforced with mandatory SHA-256 integrity validation and Android signing certificate matching.
+          </p>
+          <div class="pillar-image-container">
+            <svg viewBox="0 0 360 360" width="100%" height="100%">
+              <rect width="360" height="360" fill="#0015ff"/>
+              <g stroke="#ffffff" stroke-width="0.75" stroke-opacity="0.4">
+                <line x1="40" y1="0" x2="40" y2="360"/><line x1="80" y1="0" x2="80" y2="360"/>
+                <line x1="120" y1="0" x2="120" y2="360"/><line x1="160" y1="0" x2="160" y2="360"/>
+                <line x1="200" y1="0" x2="200" y2="360"/><line x1="240" y1="0" x2="240" y2="360"/>
+                <line x1="280" y1="0" x2="280" y2="360"/><line x1="320" y1="0" x2="320" y2="360"/>
+              </g>
+              <!-- Classical Shield & Vault Key Engraving Motif -->
+              <path d="M180,80 L250,110 L250,200 C250,250 180,285 180,285 C180,285 110,250 110,200 L110,110 Z" stroke="#ffffff" stroke-width="2" fill="#0012db"/>
+              <path d="M180,105 L235,128 L235,195 C235,235 180,265 180,265 C180,265 125,235 125,195 L125,128 Z" stroke="#ffffff" stroke-width="1" stroke-dasharray="4,2" fill="none"/>
+              <circle cx="180" cy="165" r="16" stroke="#ffffff" stroke-width="2" fill="none"/>
+              <line x1="180" y1="181" x2="180" y2="215" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="180" y1="200" x2="190" y2="200" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+              <line x1="180" y1="208" x2="190" y2="208" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Pillar #3 -->
+        <div class="pillar-card">
+          <div class="pillar-tag">#3 AUTONOMOUS QA</div>
+          <h2 class="pillar-title">Sensory Actuation</h2>
+          <p class="pillar-desc">
+            Equip Hermes Agent with camera sight, SMS 2FA test reception, display touch intents, battery metrics, and native Logcat crash stack tracing in a single toolset.
+          </p>
+          <div class="pillar-image-container">
+            <svg viewBox="0 0 360 360" width="100%" height="100%">
+              <rect width="360" height="360" fill="#0015ff"/>
+              <!-- Radiating Spark / Hand Actuator Motif (Matching Screenshot 2 Spark card) -->
+              <g stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8">
+                <line x1="180" y1="180" x2="40" y2="80"/><line x1="180" y1="180" x2="80" y2="40"/>
+                <line x1="180" y1="180" x2="140" y2="20"/><line x1="180" y1="180" x2="220" y2="20"/>
+                <line x1="180" y1="180" x2="280" y2="40"/><line x1="180" y1="180" x2="320" y2="80"/>
+                <line x1="180" y1="180" x2="340" y2="150"/><line x1="180" y1="180" x2="340" y2="220"/>
+                <line x1="180" y1="180" x2="300" y2="290"/><line x1="180" y1="180" x2="230" y2="330"/>
+                <line x1="180" y1="180" x2="130" y2="330"/><line x1="180" y1="180" x2="60" y2="290"/>
+                <line x1="180" y1="180" x2="20" y2="220"/><line x1="180" y1="180" x2="20" y2="150"/>
+              </g>
+              <!-- Electric Energy Burst -->
+              <circle cx="180" cy="180" r="45" fill="#ffffff" fill-opacity="0.25"/>
+              <circle cx="180" cy="180" r="20" fill="#ffffff"/>
+              <path d="M120,240 C140,210 160,195 180,180" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+              <path d="M260,250 C235,225 205,195 180,180" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Interactive Live Terminal Simulator -->
+  <section class="demo-section">
+    <div class="demo-header">
+      <div class="demo-badge">LIVE AGENT WORKBENCH</div>
+      <h2 class="demo-headline">See Hermes Control Physical Silicon</h2>
+      <p class="demo-subtext">
+        Select a tool call below to preview real responses captured from physical device tests.
+      </p>
+    </div>
+
+    <div class="interactive-console">
+      <div class="console-bar">
+        <div class="console-dots">
+          <span class="console-dot dot-red"></span>
+          <span class="console-dot dot-yellow"></span>
+          <span class="console-dot dot-green"></span>
+        </div>
+        <div class="console-title">hermes-agent @ physical-testbed (Redmi Note 8 / Android 11)</div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: #4ade80;">● NODE PAIRED</div>
+      </div>
+
+      <div class="tool-selector-bar">
+        <button class="tool-btn active" onclick="runTool('ping', this)">1. hdroid_ping</button>
+        <button class="tool-btn" onclick="runTool('battery', this)">2. hdroid_battery</button>
+        <button class="tool-btn" onclick="runTool('logcat', this)">3. hdroid_logcat</button>
+        <button class="tool-btn" onclick="runTool('screenshot', this)">4. hdroid_screenshot</button>
+        <button class="tool-btn" onclick="runTool('shell', this)">5. hdroid_shell</button>
+      </div>
+
+      <div class="console-screen" id="console-display">
+        <!-- Default Content -->
+        <div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_ping()</span></div>
+        <div class="log-line log-dim">Dispatching authenticated MQTT frame to node via broker...</div>
+        <div class="log-line"><span class="log-green">✓ RESPONSE RECEIVED (RTT 84ms)</span></div>
+        <div class="log-line">{</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"status"</span>: <span class="log-yellow">"PONG"</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"device"</span>: <span class="log-yellow">"Redmi Note 8 (ginkgo)"</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"android_version"</span>: <span class="log-yellow">"11"</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"sdk_int"</span>: <span class="log-yellow">30</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"paired"</span>: <span class="log-green">true</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"uptime_seconds"</span>: <span class="log-yellow">156820</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"battery_level"</span>: <span class="log-yellow">75</span>,</div>
+        <div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"charging"</span>: <span class="log-yellow">false</span></div>
+        <div class="log-line">}</div>
+        <div class="log-line log-dim">Hermes Agent: Physical node verified online and ready for QA testing.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Security & Catalog Compliance -->
+  <section class="security-section">
+    <div class="sec-card">
+      <div>
+        <h2 class="sec-title">Defense-in-Depth<br />Hardened Architecture</h2>
+        <p class="sec-desc">
+          Engineered for production environments. Hermes Droid enforces zero hardcoded tokens, on-display OTP authorization, and fail-closed authentication.
+        </p>
+        <a href="https://github.com/dalroot/hermes-droid/blob/main/docs/SECURITY_AUDIT.md" target="_blank" class="btn-pill-white">
+          <span>READ SECURITY AUDIT</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="7" y1="17" x2="17" y2="7"></line>
+            <polyline points="7 7 17 7 17 17"></polyline>
+          </svg>
+        </a>
+      </div>
+
+      <div>
+        <ul class="sec-checklist">
+          <li class="sec-check-item">
+            <span class="sec-check-icon">✓</span>
+            <div><strong>Zero Secret Bytecode:</strong> Tokens completely stripped from release APKs and managed in private encrypted SharedPreferences.</div>
+          </li>
+          <li class="sec-check-item">
+            <span class="sec-check-icon">✓</span>
+            <div><strong>Display OTP Pairing:</strong> Physical presence gate on device screen with 10-minute expiration and 3-attempt brute-force lockout.</div>
+          </li>
+          <li class="sec-check-item">
+            <span class="sec-check-icon">✓</span>
+            <div><strong>Fail-Closed HTTP:</strong> Rejects insecure URL query tokens, enforcing constant-time header verification.</div>
+          </li>
+          <li class="sec-check-item">
+            <span class="sec-check-icon">✓</span>
+            <div><strong>Automated CI/CD:</strong> All 18 tools and schemas pass official Nous Research catalog validation (hermes plugins validate).</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div>
+        <div class="footer-logo-title">Hermes Droid</div>
+        <p class="footer-desc">
+          Autonomous physical hardware testbed & mobile QA companion for Nous Research Hermes Agent.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Ecosystem</h4>
+        <ul class="footer-links">
+          <li><a href="https://nousresearch.com" target="_blank">Nous Research</a></li>
+          <li><a href="https://hermes-agent.nousresearch.com" target="_blank">Hermes AI Agent</a></li>
+          <li><a href="https://github.com/NousResearch/hermes-agent" target="_blank">Hermes GitHub</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Project</h4>
+        <ul class="footer-links">
+          <li><a href="https://github.com/dalroot/hermes-droid" target="_blank">Repository</a></li>
+          <li><a href="https://github.com/dalroot/hermes-droid/releases" target="_blank">APK Releases</a></li>
+          <li><a href="https://github.com/dalroot/hermes-droid/blob/main/docs/SECURITY_AUDIT.md" target="_blank">Security Audit</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Hackathon</h4>
+        <ul class="footer-links">
+          <li><a href="https://github.com/NousResearch/hermes-agent/issues" target="_blank">Catalog Submission</a></li>
+          <li><a href="https://github.com/dalroot/hermes-droid/blob/main/LICENSE" target="_blank">MIT License</a></li>
+          <li><a href="https://x.com/NousResearch" target="_blank">@NousResearch</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>© 2026 Hermes Droid. Submitted to Nous Research Hermes Agent Hackathon ($20k).</div>
+      <div>Hermes is a registered trademark of Nous Research.</div>
+    </div>
+  </footer>
+
+  <script>
+    const snippets = {
+      plugin: 'hermes plugins install hermes-droid',
+      pair: 'python3 plugin/bridge.py --pair 489201',
+      clone: 'git clone https://github.com/dalroot/hermes-droid.git'
+    };
+
+    function switchTab(type, el) {
+      document.querySelectorAll('.terminal-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('terminal-snippet').innerText = snippets[type];
+    }
+
+    function copySnippet() {
+      const text = document.getElementById('terminal-snippet').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const icon = document.getElementById('copy-icon');
+        icon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+        setTimeout(() => {
+          icon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+        }, 1500);
+      });
+    }
+
+    const mockLogs = {
+      ping: [
+        '<div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_ping()</span></div>',
+        '<div class="log-line log-dim">Dispatching authenticated MQTT frame to node via broker...</div>',
+        '<div class="log-line"><span class="log-green">✓ RESPONSE RECEIVED (RTT 84ms)</span></div>',
+        '<div class="log-line">{</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"status"</span>: <span class="log-yellow">"PONG"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"device"</span>: <span class="log-yellow">"Redmi Note 8 (ginkgo)"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"android_version"</span>: <span class="log-yellow">"11"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"sdk_int"</span>: <span class="log-yellow">30</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"paired"</span>: <span class="log-green">true</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"uptime_seconds"</span>: <span class="log-yellow">156820</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"battery_level"</span>: <span class="log-yellow">75</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"charging"</span>: <span class="log-yellow">false</span></div>',
+        '<div class="log-line">}</div>',
+        '<div class="log-line log-dim">Hermes Agent: Physical node verified online and ready for QA testing.</div>'
+      ],
+      battery: [
+        '<div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_battery()</span></div>',
+        '<div class="log-line log-dim">Querying Android BatteryManager hardware HAL...</div>',
+        '<div class="log-line"><span class="log-green">✓ TELEMETRY RECEIVED</span></div>',
+        '<div class="log-line">{</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"percentage"</span>: <span class="log-yellow">75</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"health"</span>: <span class="log-yellow">"GOOD"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"temperature_celsius"</span>: <span class="log-yellow">31.4</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"voltage_mv"</span>: <span class="log-yellow">4022</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"technology"</span>: <span class="log-yellow">"Li-poly"</span></div>',
+        '<div class="log-line">}</div>',
+        '<div class="log-line log-dim">Hermes Agent: Thermal state nominal (31.4°C). Safe to proceed with stress test.</div>'
+      ],
+      logcat: [
+        '<div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_logcat(lines=5, filter="fatal")</span></div>',
+        '<div class="log-line log-dim">Streaming Android system ring-buffer via IPC...</div>',
+        '<div class="log-line log-dim">11-09 17:42:10.112 10842 10842 I ActivityTaskManager: START u0 {cmp=org.nous.hermesdroid/.MainActivity}</div>',
+        '<div class="log-line log-dim">11-09 17:42:10.245 10842 10890 D HermesNodeService: MQTT connection established (client: node-5ad8)</div>',
+        '<div class="log-line log-dim">11-09 17:42:10.280 10842 10890 I HermesNodeService: Display OTP state verified [TTL: 580s]</div>',
+        '<div class="log-line log-dim">11-09 17:42:10.310 10842 10842 I ViewRootImpl[MainActivity]: Resized window to 1080x2340</div>',
+        '<div class="log-line"><span class="log-green">✓ 0 FATAL ERRORS FOUND. APPLICATION HEALTHY.</span></div>'
+      ],
+      screenshot: [
+        '<div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_screenshot()</span></div>',
+        '<div class="log-line log-dim">Capturing physical display framebuffer (1080x2340 @ 60Hz)...</div>',
+        '<div class="log-line"><span class="log-green">✓ FRAMEBUFFER CAPTURED</span></div>',
+        '<div class="log-line">{</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"format"</span>: <span class="log-yellow">"image/png"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"resolution"</span>: <span class="log-yellow">"1080x2340"</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"size_bytes"</span>: <span class="log-yellow">412890</span>,</div>',
+        '<div class="log-line">&nbsp;&nbsp;<span class="log-cyan">"sha256"</span>: <span class="log-yellow">"d8f3e2...7c1a"</span></div>',
+        '<div class="log-line">}</div>',
+        '<div class="log-line log-dim">Hermes Agent: Screenshot ingested into multimodal vision context.</div>'
+      ],
+      shell: [
+        '<div class="log-line"><span class="log-purple">hermes-agent</span>: Tool call initiated -> <span class="log-cyan">hdroid_shell(cmd="getprop ro.build.version.release")</span></div>',
+        '<div class="log-line log-dim">Executing authenticated shell command on target node...</div>',
+        '<div class="log-line"><span class="log-green">✓ EXIT CODE: 0</span></div>',
+        '<div class="log-line"><span class="log-yellow">11</span></div>',
+        '<div class="log-line log-dim">Hermes Agent: Target confirmed running Android 11.</div>'
+      ]
+    };
+
+    function runTool(tool, el) {
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+      const screen = document.getElementById('console-display');
+      screen.innerHTML = mockLogs[tool].join('');
+    }
+  </script>
+</body>
+</html>
