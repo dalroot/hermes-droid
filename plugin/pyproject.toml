@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-droid"
+version = "0.1.0"
+description = "Autonomous physical testbed and on-device companion node for Hermes Agent"
+readme = "README.md"
+authors = [{ name = "Hermes Droid Community" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28.0",
+    "urllib3>=1.26.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.10.0"
+]

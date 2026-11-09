@@ -1,0 +1,33 @@
+name: hermes-droid
+version: 0.1.0
+description: "Autonomous physical testbed and on-device companion node for Hermes Agent — wireless APK deployments, Logcat crash diagnostics, UI/UX screen captures, and granular hardware sensor telemetry."
+author: Nous Community
+kind: standalone
+category: platform
+platforms:
+  - linux
+  - macos
+  - windows
+  - android
+requires_hermes: ">=0.19.0"
+provides_tools:
+  - android_device_info
+  - android_read_sms
+  - android_send_sms
+  - android_get_notifications
+  - android_reply_notification
+  - android_call_phone
+  - android_adb_shell
+  - android_install_apk
+  - android_toggle_setting
+  - android_clipboard_sync
+  - android_take_screenshot
+  - android_contacts_search
+  - android_media_recent_photos
+  - android_device_logs
+  - android_radio_silence
+  - android_camera_snapshot
+  - android_location_get
+  - android_device_alarm
+provides_hooks:
+  - on_session_end

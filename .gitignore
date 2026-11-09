@@ -1,0 +1,40 @@
+# Build & Output Artifacts
+**/build/
+build/
+.gradle/
+**/.gradle/
+*.apk
+*.aab
+dist/
+release/
+
+# Secrets & Local Configurations (Strict Zero Git Leak)
+local.properties
+**/local.properties
+HANDOFF.md
+FINANCIAL_REPORT.md
+*.secret.*
+.env
+.env.*
+!*.example.*
+!*.example.md
+private_docs/
+
+# Python Cache & Bytecode
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# IDE & Editor Specific
+.idea/
+**/.idea/
+*.iml
+.vscode/
+**/.vscode/
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
