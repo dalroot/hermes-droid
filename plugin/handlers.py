@@ -159,7 +159,10 @@ def handle_adb_shell(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_install_apk(params: Dict[str, Any], **kwargs) -> str:
-    """Install APK package onto device."""
+    """Install APK package onto device wirelessly over MQTT or ADB fallback."""
+    import base64
+    import hashlib
+
     apk_path = params.get("apk_path")
     reinstall = params.get("reinstall", True)
     bridge = get_bridge()
@@ -167,15 +170,54 @@ def handle_install_apk(params: Dict[str, Any], **kwargs) -> str:
     if not apk_path:
         return json.dumps({"error": "apk_path is required"})
 
+    # 1. Local file path -> calculate sha256 and base64 encode for wireless MQTT deployment
     if os.path.exists(apk_path):
+        mqtt_err = None
+        try:
+            with open(apk_path, "rb") as f:
+                content = f.read()
+            file_sha256 = hashlib.sha256(content).hexdigest()
+            b64_content = base64.b64encode(content).decode("ascii")
+
+            mqtt_res = bridge.send_command("install_apk", {
+                "apk_b64": b64_content,
+                "sha256": file_sha256,
+                "reinstall": reinstall,
+            }, timeout=60.0)
+
+            if mqtt_res.get("success"):
+                return json.dumps(mqtt_res, ensure_ascii=False, indent=2)
+            mqtt_err = mqtt_res.get("error", "MQTT install failed")
+        except Exception as e:
+            mqtt_err = str(e)
+
+        # Secondary ADB fallback if USB cable is physically attached
         adb_args = ["install"]
         if reinstall:
             adb_args.append("-r")
         adb_args.append(apk_path)
         res = bridge.exec_adb_command(adb_args, timeout=60)
-        return json.dumps(res, indent=2)
+        if res.get("success"):
+            return json.dumps(res, indent=2)
 
-    # Download URL case
+        return json.dumps({
+            "success": False,
+            "error": "Failed to install APK wirelessly and ADB fallback was unavailable.",
+            "mqtt_details": mqtt_err,
+            "adb_details": res.get("error"),
+        }, indent=2)
+
+    # 2. Remote URL case
+    if apk_path.startswith("http://") or apk_path.startswith("https://"):
+        sha256 = params.get("sha256", "")
+        mqtt_res = bridge.send_command("install_apk", {
+            "url": apk_path,
+            "sha256": sha256,
+        }, timeout=60.0)
+        if mqtt_res.get("success"):
+            return json.dumps(mqtt_res, ensure_ascii=False, indent=2)
+        return json.dumps(mqtt_res, indent=2)
+
     return json.dumps({"error": f"Local APK file not found at {apk_path}"})
 
 
@@ -270,7 +312,7 @@ def handle_media_recent_photos(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_device_logs(params: Dict[str, Any], **kwargs) -> str:
-    """Retrieve specialized device logs."""
+    """Retrieve specialized device logs wirelessly over MQTT or ADB fallback."""
     buffer = params.get("buffer", "system")
     lines = params.get("lines", 50)
     bridge = get_bridge()
@@ -279,7 +321,7 @@ def handle_device_logs(params: Dict[str, Any], **kwargs) -> str:
     if res.get("success"):
         return json.dumps(res.get("data", res), ensure_ascii=False, indent=2)
 
-    # ADB direct logcat / dumpsys fallback
+    # Secondary ADB direct logcat / dumpsys fallback if USB attached
     if buffer == "dumpsys":
         adb_res = bridge.exec_adb_command(["shell", "dumpsys", "battery"])
     else:
@@ -288,7 +330,12 @@ def handle_device_logs(params: Dict[str, Any], **kwargs) -> str:
     if adb_res.get("success"):
         return json.dumps({"source": "adb_logcat", "buffer": buffer, "content": adb_res.get("stdout")}, indent=2)
 
-    return json.dumps({"error": "Failed to retrieve logs.", "details": res.get("error")})
+    return json.dumps({
+        "success": False,
+        "error": "Failed to retrieve logs wirelessly over MQTT and ADB cable fallback was not connected.",
+        "mqtt_details": res.get("error"),
+        "hint": "Ensure the phone is online and paired on the Hermes Droid MQTT network. No USB cable is needed in wireless mode."
+    }, indent=2)
 
 
 def handle_radio_silence(params: Dict[str, Any], **kwargs) -> str:

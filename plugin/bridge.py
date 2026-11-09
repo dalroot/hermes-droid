@@ -20,9 +20,41 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("hermes_droid.bridge")
 
-DEFAULT_BROKER = os.environ.get("HERMES_DROID_BROKER", "127.0.0.1")
-DEFAULT_PORT = int(os.environ.get("HERMES_DROID_PORT", "1883"))
-DEFAULT_DEVICE_ID = os.environ.get("HERMES_DROID_DEVICE_ID", "")
+def _get_default_config() -> tuple[str, int, str]:
+    """Retrieve MQTT broker config from environment or ~/.hermes/.env fallback."""
+    broker = os.environ.get("HERMES_DROID_BROKER")
+    port_str = os.environ.get("HERMES_DROID_PORT")
+    device_id = os.environ.get("HERMES_DROID_DEVICE_ID")
+
+    if not (broker and port_str and device_id):
+        env_file = os.path.expanduser("~/.hermes/.env")
+        if os.path.isfile(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k == "HERMES_DROID_BROKER" and not broker:
+                            broker = v
+                        elif k == "HERMES_DROID_PORT" and not port_str:
+                            port_str = v
+                        elif k == "HERMES_DROID_DEVICE_ID" and not device_id:
+                            device_id = v
+            except Exception as e:
+                logger.debug(f"Could not parse ~/.hermes/.env: {e}")
+
+    return (
+        broker or "127.0.0.1",
+        int(port_str or "1883"),
+        device_id or "",
+    )
+
+
+DEFAULT_BROKER, DEFAULT_PORT, DEFAULT_DEVICE_ID = _get_default_config()
 
 
 class AndroidBridge:

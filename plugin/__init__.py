@@ -6,6 +6,7 @@ Exposes tools to interact with Android devices directly or via the Hermes Droid 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from .bridge import get_bridge
@@ -103,3 +104,11 @@ def register(ctx: Any) -> None:
         ctx.register_hook("on_session_end", _on_session_end)
     except Exception as e:
         logger.debug("Could not register on_session_end hook: %s", e)
+
+    # Register hermes-droid skill documentation
+    skill_md = os.path.join(os.path.dirname(__file__), "SKILL.md")
+    if os.path.isfile(skill_md) and hasattr(ctx, "register_skill"):
+        try:
+            ctx.register_skill("hermes-droid", skill_md)
+        except Exception as e:
+            logger.debug("Could not register skill hermes-droid: %s", e)
