@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install paho-mqtt requests pytest ruamel.yaml
+          pip install paho-mqtt requests pytest ruamel.yaml pyyaml
 
       - name: Run Plugin Unit Tests
         run: |
