@@ -50,7 +50,7 @@ class HermesNodeService : Service() {
 
     private fun loadPreferences() {
         val prefs = getSharedPreferences("hermes_prefs", Context.MODE_PRIVATE)
-        val host = prefs.getString("mqtt_host", "192.209.62.115") ?: "192.209.62.115"
+        val host = prefs.getString("mqtt_host", "127.0.0.1") ?: "127.0.0.1"
         val port = prefs.getInt("mqtt_port", 1883)
         _mqttBrokerHost.value = host
         _mqttBrokerPort.value = port
@@ -361,13 +361,13 @@ class HermesNodeService : Service() {
         private val _pairingToken = MutableStateFlow(generateRandomToken())
         val pairingToken: StateFlow<String> = _pairingToken.asStateFlow()
 
-        private val _mqttBrokerHost = MutableStateFlow("192.209.62.115")
+        private val _mqttBrokerHost = MutableStateFlow("127.0.0.1")
         val mqttBrokerHost: StateFlow<String> = _mqttBrokerHost.asStateFlow()
 
         private val _mqttBrokerPort = MutableStateFlow(1883)
         val mqttBrokerPort: StateFlow<Int> = _mqttBrokerPort.asStateFlow()
 
-        private val _mqttStatus = MutableStateFlow(MqttStatus(brokerHost = "192.209.62.115", brokerPort = 1883))
+        private val _mqttStatus = MutableStateFlow(MqttStatus(brokerHost = "127.0.0.1", brokerPort = 1883))
         val mqttStatus: StateFlow<MqttStatus> = _mqttStatus.asStateFlow()
 
         fun setMqttStatus(status: MqttStatus) {
