@@ -1,5 +1,6 @@
 package com.hermesdroid.service
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,11 +8,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,7 +50,7 @@ class HermesNodeService : Service() {
 
     private fun loadPreferences() {
         val prefs = getSharedPreferences("hermes_prefs", Context.MODE_PRIVATE)
-        val host = prefs.getString("mqtt_host", "127.0.0.1") ?: "127.0.0.1"
+        val host = prefs.getString("mqtt_host", "192.209.62.115") ?: "192.209.62.115"
         val port = prefs.getInt("mqtt_port", 1883)
         _mqttBrokerHost.value = host
         _mqttBrokerPort.value = port
@@ -99,12 +102,36 @@ class HermesNodeService : Service() {
 
         val notification = createNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
-                          ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+
+            val hasLocation = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasLocation) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
+
+            val hasCamera = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasCamera && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             }
-            startForeground(NOTIFICATION_ID, notification, fgsType)
+
+            try {
+                startForeground(NOTIFICATION_ID, notification, fgsType)
+            } catch (_: Exception) {
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } catch (_: Exception) {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            }
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -334,13 +361,13 @@ class HermesNodeService : Service() {
         private val _pairingToken = MutableStateFlow(generateRandomToken())
         val pairingToken: StateFlow<String> = _pairingToken.asStateFlow()
 
-        private val _mqttBrokerHost = MutableStateFlow("127.0.0.1")
+        private val _mqttBrokerHost = MutableStateFlow("192.209.62.115")
         val mqttBrokerHost: StateFlow<String> = _mqttBrokerHost.asStateFlow()
 
         private val _mqttBrokerPort = MutableStateFlow(1883)
         val mqttBrokerPort: StateFlow<Int> = _mqttBrokerPort.asStateFlow()
 
-        private val _mqttStatus = MutableStateFlow(MqttStatus(brokerHost = "127.0.0.1", brokerPort = 1883))
+        private val _mqttStatus = MutableStateFlow(MqttStatus(brokerHost = "192.209.62.115", brokerPort = 1883))
         val mqttStatus: StateFlow<MqttStatus> = _mqttStatus.asStateFlow()
 
         fun setMqttStatus(status: MqttStatus) {
