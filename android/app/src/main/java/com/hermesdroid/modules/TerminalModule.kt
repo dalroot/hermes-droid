@@ -1,7 +1,7 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.content.Context
-import org.nous.hermesdroid.model.ShellExecutionResult
+import com.hermesdroid.model.ShellExecutionResult
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit

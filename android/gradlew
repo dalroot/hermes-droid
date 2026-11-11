@@ -62,6 +62,18 @@ cd "$SAVED" >/dev/null
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+if [ ! -e "$CLASSPATH" ]; then
+    if command -v gradle >/dev/null 2>&1; then
+        echo "gradle-wrapper.jar not found. Regenerating wrapper using local gradle..."
+        (cd "$APP_HOME" && gradle wrapper)
+    else
+        die "ERROR: gradle-wrapper.jar not found at $CLASSPATH.
+In compliance with open-source security audit requirements (Teknium review #8),
+pre-compiled wrapper binaries are not tracked in git.
+Please install Gradle and run 'gradle wrapper' in the android directory, or compile directly using 'gradle assembleRelease'."
+    fi
+fi
+
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then

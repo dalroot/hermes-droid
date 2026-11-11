@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -9,7 +9,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONArray
 import org.json.JSONObject
-import org.nous.hermesdroid.service.HermesNodeService
+import com.hermesdroid.service.HermesNodeService
 
 class HermesAccessibilityService : AccessibilityService() {
 

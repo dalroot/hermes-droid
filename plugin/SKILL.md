@@ -2,7 +2,7 @@
 name: hermes-droid
 description: Autonomous physical testbed & mobile companion node for Hermes Agent over wireless MQTT. Controls hardware, captures UI, runs on-device shell commands, captures crash logs, deploys APKs, and handles SMS/notifications without USB cables.
 version: 0.1.0
-author: Nous Community
+author: dalroot
 license: MIT
 platforms: [linux, macos, windows, android]
 metadata:
@@ -14,12 +14,16 @@ metadata:
 
 # Hermes Droid — Autonomous Android Testbed & Companion Node
 
-Hermes Droid bridges Hermes Agent to a paired physical Android smartphone or testbed device wirelessly over an encrypted MQTT broker network.
+Hermes Droid bridges Hermes Agent to a paired physical Android smartphone or testbed device wirelessly over an MQTT broker network (with mandatory TLS encryption and authentication enforced for all non-loopback connections).
 
 > **CRITICAL ARCHITECTURE PRINCIPLE (ZERO-CABLE PHILOSOPHY):**
 > You are directly paired with an autonomous Android device running the Hermes Droid companion app.
 > **DO NOT require, request, or suggest USB cables or local host ADB commands.**
 > All operations (logs, shell commands, screenshots, APK installation, UI interactions, hardware sensors) are executed over the wireless MQTT mesh directly by the on-device companion app.
+
+### Transport Security & Encryption Policy
+- **Local Loopback (`127.0.0.1` / `localhost`):** Standard unencrypted TCP (port 1883) or local TLS (port 8883) is permitted for local development.
+- **Remote / Non-Loopback Brokers:** TLS encryption (`tls_enabled: true`, invoking `client.tls_set()`) and username/password authentication (`HERMES_DROID_MQTT_USER` and `HERMES_DROID_MQTT_PASSWORD`) are strictly enforced. Unencrypted or unauthenticated connections to remote brokers are rejected fail-closed.
 
 ---
 

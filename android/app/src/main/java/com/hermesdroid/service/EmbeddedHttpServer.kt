@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.service
+package com.hermesdroid.service
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -9,7 +9,7 @@ import android.os.Vibrator
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
-import org.nous.hermesdroid.modules.*
+import com.hermesdroid.modules.*
 
 class EmbeddedHttpServer(
     private val context: Context,

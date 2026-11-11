@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.service
+package com.hermesdroid.service
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -17,7 +17,7 @@ class BootReceiver : BroadcastReceiver() {
             action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             action == "android.intent.action.QUICKBOOT_POWERON" ||
             action == "com.htc.intent.action.QUICKBOOT_POWERON" ||
-            action == "org.nous.hermesdroid.RESTART_SERVICE"
+            action == "com.hermesdroid.RESTART_SERVICE"
         ) {
             val serviceIntent = Intent(context, HermesNodeService::class.java)
             try {

@@ -1,7 +1,9 @@
 name: hermes-droid
 version: 0.1.0
+manifest_version: 2
+api_version: 1
 description: "Autonomous physical testbed and on-device companion node for Hermes Agent — wireless APK deployments, Logcat crash diagnostics, UI/UX screen captures, and granular hardware sensor telemetry."
-author: Nous Community
+author: dalroot
 kind: standalone
 category: platform
 platforms:
@@ -10,6 +12,54 @@ platforms:
   - windows
   - android
 requires_hermes: ">=0.19.0"
+config_schema:
+  broker_host:
+    type: str
+    default: "127.0.0.1"
+    label: "MQTT Broker Host"
+    description: "Hostname or IP address of the MQTT broker."
+    required: false
+  broker_port:
+    type: int
+    default: 1883
+    label: "MQTT Broker Port"
+    description: "TCP/TLS port of the MQTT broker (1883 for loopback, 8883 for TLS)."
+    required: false
+  device_id:
+    type: str
+    default: ""
+    label: "Target Android Device ID"
+    description: "Explicitly configured Android device identifier from the companion app."
+    required: false
+  tls_enabled:
+    type: bool
+    default: false
+    label: "Enable MQTT TLS"
+    description: "Use TLS encryption for MQTT connections (required for non-loopback brokers)."
+    required: false
+  allowed_apk_dir:
+    type: str
+    default: ""
+    label: "Allowed APK Directory"
+    description: "Host directory from which APK installations are permitted (defaults to plugin data dir)."
+    required: false
+  mqtt_user:
+    type: secret
+    env: HERMES_DROID_MQTT_USER
+    label: "MQTT Broker Username"
+    description: "Broker username stored in Hermes environment credentials."
+  mqtt_password:
+    type: secret
+    env: HERMES_DROID_MQTT_PASSWORD
+    label: "MQTT Broker Password"
+    description: "Broker password stored in Hermes environment credentials."
+requires_env:
+  - name: HERMES_DROID_MQTT_USER
+    description: "MQTT broker username (required when connecting to authenticated or non-loopback brokers)"
+    secret: false
+  - name: HERMES_DROID_MQTT_PASSWORD
+    description: "MQTT broker password (required when connecting to authenticated or non-loopback brokers)"
+    secret: true
 provides_tools:
   - android_device_info
   - android_read_sms
@@ -31,3 +81,4 @@ provides_tools:
   - android_device_alarm
 provides_hooks:
   - on_session_end
+  - pre_tool_call

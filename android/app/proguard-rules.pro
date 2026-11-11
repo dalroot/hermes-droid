@@ -17,7 +17,7 @@
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler { *; }
 
 # Models
--keep class org.nous.hermesdroid.model.** { *; }
+-keep class com.hermesdroid.model.** { *; }
 
 # Paho MQTT
 -dontwarn org.eclipse.paho.client.mqttv3.**

@@ -4,11 +4,82 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import tempfile
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from .bridge import get_bridge
+from .bridge import get_bridge, get_plugin_data_dir
+
+STATE_CHANGING_TOOLS = frozenset({
+    "android_adb_shell",
+    "android_send_sms",
+    "android_call_phone",
+    "android_install_apk",
+    "android_reply_notification",
+    "android_radio_silence",
+    "android_toggle_setting",
+    "android_device_alarm",
+})
+
+
+def is_unattended_or_cron(ctx: Any = None) -> bool:
+    """Check if the current execution is running inside an unattended or cron session."""
+    if ctx is not None and hasattr(ctx, "current_cron_execution") and callable(ctx.current_cron_execution):
+        try:
+            if ctx.current_cron_execution() is not None:
+                return True
+        except Exception:
+            pass
+
+    try:
+        from cron.execution_identity import current_cron_execution
+        if current_cron_execution() is not None:
+            return True
+    except Exception:
+        pass
+
+    try:
+        from gateway.session_context import get_session_env
+        cron_val = str(get_session_env("HERMES_CRON_SESSION", "")).strip().lower()
+        if cron_val in ("1", "true", "yes", "t", "y"):
+            return True
+        sq_val = str(get_session_env("HERMES_SINGLE_QUERY_SESSION", "")).strip().lower()
+        if sq_val in ("1", "true", "yes", "t", "y"):
+            return True
+    except Exception:
+        pass
+
+    cron_env = str(os.environ.get("HERMES_CRON_SESSION", "")).strip().lower()
+    if cron_env in ("1", "true", "yes", "t", "y"):
+        return True
+
+    sq_env = str(os.environ.get("HERMES_SINGLE_QUERY_SESSION", "")).strip().lower()
+    if sq_env in ("1", "true", "yes", "t", "y"):
+        return True
+
+    return False
+
+
+def is_state_changing_tool(tool_name: str, args: Optional[Dict[str, Any]] = None) -> bool:
+    """Determine whether an Android tool call alters physical device, telecom, or system state."""
+    if tool_name in STATE_CHANGING_TOOLS:
+        return True
+    if tool_name == "android_clipboard_sync":
+        args_dict = args if isinstance(args, dict) else {}
+        action = str(args_dict.get("action", "")).strip().lower()
+        text = args_dict.get("text")
+        if action == "set" or (text is not None and str(text) != ""):
+            return True
+    return False
+
+
+def _cron_refusal_json(tool_name: str) -> str:
+    """Standardized fail-closed error payload for state-changing operations in cron/unattended runs."""
+    return json.dumps({
+        "success": False,
+        "error": f"State-changing tool '{tool_name}' is refused in unattended or cron execution without an interactive user.",
+    }, ensure_ascii=False, indent=2)
 
 
 def handle_device_info(params: Dict[str, Any], **kwargs) -> str:
@@ -63,6 +134,8 @@ def handle_read_sms(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_send_sms(params: Dict[str, Any], **kwargs) -> str:
     """Send SMS to recipient."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_send_sms")
     recipient = params.get("recipient")
     message = params.get("message")
     if not recipient or not message:
@@ -110,6 +183,8 @@ def handle_get_notifications(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_reply_notification(params: Dict[str, Any], **kwargs) -> str:
     """Send inline reply to active notification."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_reply_notification")
     bridge = get_bridge()
     res = bridge.send_request("api/v1/notifications/reply", {
         "notification_key": params.get("notification_key"),
@@ -120,6 +195,8 @@ def handle_reply_notification(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_call_phone(params: Dict[str, Any], **kwargs) -> str:
     """Place phone call or open dialer."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_call_phone")
     phone_number = params.get("phone_number")
     direct = params.get("direct", False)
     bridge = get_bridge()
@@ -144,6 +221,8 @@ def handle_call_phone(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_adb_shell(params: Dict[str, Any], **kwargs) -> str:
     """Execute shell command on device."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_adb_shell")
     command = params.get("command")
     timeout = params.get("timeout_seconds", 15)
     bridge = get_bridge()
@@ -160,6 +239,8 @@ def handle_adb_shell(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_install_apk(params: Dict[str, Any], **kwargs) -> str:
     """Install APK package onto device wirelessly over MQTT or ADB fallback."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_install_apk")
     import base64
     import hashlib
 
@@ -168,61 +249,94 @@ def handle_install_apk(params: Dict[str, Any], **kwargs) -> str:
     bridge = get_bridge()
 
     if not apk_path:
-        return json.dumps({"error": "apk_path is required"})
+        return json.dumps({"success": False, "error": "apk_path is required"})
 
-    # 1. Local file path -> calculate sha256 and base64 encode for wireless MQTT deployment
-    if os.path.exists(apk_path):
-        mqtt_err = None
-        try:
-            with open(apk_path, "rb") as f:
-                content = f.read()
-            file_sha256 = hashlib.sha256(content).hexdigest()
-            b64_content = base64.b64encode(content).decode("ascii")
-
-            mqtt_res = bridge.send_command("install_apk", {
-                "apk_b64": b64_content,
-                "sha256": file_sha256,
-                "reinstall": reinstall,
-            }, timeout=60.0)
-
-            if mqtt_res.get("success"):
-                return json.dumps(mqtt_res, ensure_ascii=False, indent=2)
-            mqtt_err = mqtt_res.get("error", "MQTT install failed")
-        except Exception as e:
-            mqtt_err = str(e)
-
-        # Secondary ADB fallback if USB cable is physically attached
-        adb_args = ["install"]
-        if reinstall:
-            adb_args.append("-r")
-        adb_args.append(apk_path)
-        res = bridge.exec_adb_command(adb_args, timeout=60)
-        if res.get("success"):
-            return json.dumps(res, indent=2)
-
-        return json.dumps({
-            "success": False,
-            "error": "Failed to install APK wirelessly and ADB fallback was unavailable.",
-            "mqtt_details": mqtt_err,
-            "adb_details": res.get("error"),
-        }, indent=2)
-
-    # 2. Remote URL case
-    if apk_path.startswith("http://") or apk_path.startswith("https://"):
+    # 1. Remote URL case
+    raw_path = str(apk_path).strip()
+    if raw_path.startswith("http://") or raw_path.startswith("https://"):
         sha256 = params.get("sha256", "")
         mqtt_res = bridge.send_command("install_apk", {
-            "url": apk_path,
+            "url": raw_path,
             "sha256": sha256,
         }, timeout=60.0)
         if mqtt_res.get("success"):
             return json.dumps(mqtt_res, ensure_ascii=False, indent=2)
         return json.dumps(mqtt_res, indent=2)
 
-    return json.dumps({"error": f"Local APK file not found at {apk_path}"})
+    # 2. Local file path -> enforce .apk extension and path containment inside allowed directory (Finding #4)
+    if not raw_path.lower().endswith(".apk"):
+        return json.dumps({
+            "success": False,
+            "error": f"Security policy violation: file '{raw_path}' must have a '.apk' extension.",
+        })
+
+    # Determine allowed directory: user-configured allowed_apk_dir or plugin data directory / apks
+    configured_dir = getattr(bridge, "allowed_apk_dir", "")
+    if configured_dir and str(configured_dir).strip():
+        allowed_dir = os.path.realpath(os.path.abspath(os.path.expanduser(str(configured_dir).strip())))
+    else:
+        allowed_dir = os.path.realpath(os.path.join(get_plugin_data_dir(), "apks"))
+    os.makedirs(allowed_dir, mode=0o700, exist_ok=True)
+
+    resolved_apk = os.path.realpath(os.path.abspath(os.path.expanduser(raw_path)))
+
+    try:
+        is_contained = (resolved_apk != allowed_dir) and (os.path.commonpath([resolved_apk, allowed_dir]) == allowed_dir)
+    except ValueError:
+        is_contained = False
+
+    if not is_contained:
+        return json.dumps({
+            "success": False,
+            "error": (
+                f"Path traversal security violation: APK path '{raw_path}' resolves to '{resolved_apk}', "
+                f"which is outside the allowed directory '{allowed_dir}'."
+            ),
+        })
+
+    if not os.path.isfile(resolved_apk):
+        return json.dumps({"success": False, "error": f"Local APK file not found at '{resolved_apk}'."})
+
+    mqtt_err = None
+    try:
+        with open(resolved_apk, "rb") as f:
+            content = f.read()
+        file_sha256 = hashlib.sha256(content).hexdigest()
+        b64_content = base64.b64encode(content).decode("ascii")
+
+        mqtt_res = bridge.send_command("install_apk", {
+            "apk_b64": b64_content,
+            "sha256": file_sha256,
+            "reinstall": reinstall,
+        }, timeout=60.0)
+
+        if mqtt_res.get("success"):
+            return json.dumps(mqtt_res, ensure_ascii=False, indent=2)
+        mqtt_err = mqtt_res.get("error", "MQTT install failed")
+    except Exception as e:
+        mqtt_err = str(e)
+
+    # Secondary ADB fallback if USB cable is physically attached
+    adb_args = ["install"]
+    if reinstall:
+        adb_args.append("-r")
+    adb_args.append(resolved_apk)
+    res = bridge.exec_adb_command(adb_args, timeout=60)
+    if res.get("success"):
+        return json.dumps(res, indent=2)
+
+    return json.dumps({
+        "success": False,
+        "error": "Failed to install APK wirelessly and ADB fallback was unavailable.",
+        "mqtt_details": mqtt_err,
+        "adb_details": res.get("error"),
+    }, indent=2)
 
 
 def handle_toggle_setting(params: Dict[str, Any], **kwargs) -> str:
     """Control hardware feature / setting."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_toggle_setting")
     setting = params.get("setting")
     value = params.get("value")
     bridge = get_bridge()
@@ -244,6 +358,8 @@ def handle_clipboard_sync(params: Dict[str, Any], **kwargs) -> str:
     """Read or set clipboard text."""
     action = params.get("action")
     text = params.get("text", "")
+    if (str(action).strip().lower() == "set" or (text is not None and str(text) != "")) and is_unattended_or_cron():
+        return _cron_refusal_json("android_clipboard_sync")
     bridge = get_bridge()
 
     res = bridge.send_request("api/v1/device/clipboard", {"action": action, "text": text})
@@ -251,8 +367,22 @@ def handle_clipboard_sync(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_take_screenshot(params: Dict[str, Any], **kwargs) -> str:
-    """Capture screen and download."""
-    dest = params.get("destination_path") or os.path.join(tempfile.gettempdir(), f"screenshot_{int(time.time())}.png")
+    """Capture screen and download (confined strictly to plugin data directory)."""
+    media_dir = os.path.realpath(os.path.join(get_plugin_data_dir(), "media"))
+    os.makedirs(media_dir, mode=0o700, exist_ok=True)
+
+    raw_dest = params.get("destination_path")
+    if raw_dest and str(raw_dest).strip():
+        filename = os.path.basename(str(raw_dest).strip())
+        if not filename.lower().endswith(".png"):
+            filename = f"{filename}.png"
+    else:
+        filename = f"screenshot_{int(time.time())}.png"
+
+    dest = os.path.realpath(os.path.join(media_dir, filename))
+    if os.path.commonpath([dest, media_dir]) != media_dir:
+        dest = os.path.join(media_dir, f"screenshot_{int(time.time())}.png")
+
     bridge = get_bridge()
 
     # 1. Try companion app screenshot
@@ -277,10 +407,32 @@ def handle_take_screenshot(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_contacts_search(params: Dict[str, Any], **kwargs) -> str:
-    """Search address book contacts."""
-    query = params.get("query", "")
-    limit = params.get("limit", 10)
+    """Search address book contacts safely without SQL/query injection."""
+    raw_query = params.get("query", "")
+    query = str(raw_query) if raw_query is not None else ""
+    raw_limit = params.get("limit", 10)
+    try:
+        limit = int(raw_limit)
+    except (ValueError, TypeError):
+        limit = 10
     bridge = get_bridge()
+
+    # Reject quotes and dangerous SQL injection syntax in query clause (Finding #7)
+    if any(char in query for char in ("'", '"', ";", "\\")) or "--" in query or "/*" in query or "*/" in query:
+        return json.dumps({
+            "success": False,
+            "error": "Invalid search query: quotes, semicolons, backslashes, and SQL comment markers are forbidden in contacts search.",
+        })
+
+    upper_query = f" {query.upper()} "
+    dangerous_keywords = (" UNION ", " SELECT ", " DROP ", " DELETE ", " UPDATE ", " INSERT ", " ALTER ", " EXEC ")
+    if any(kw in upper_query for kw in dangerous_keywords):
+        return json.dumps({
+            "success": False,
+            "error": "Invalid search query: SQL statement keywords are forbidden in contacts search.",
+        })
+
+    safe_query = query.replace("'", "''")
 
     res = bridge.send_request("api/v1/contacts/search", {"query": query, "limit": limit})
     if res.get("success"):
@@ -290,7 +442,7 @@ def handle_contacts_search(params: Dict[str, Any], **kwargs) -> str:
     adb_res = bridge.exec_adb_command([
         "shell", "content", "query", "--uri", "content://com.android.contacts/data/phones",
         "--projection", "display_name:data1",
-        "--where", f"display_name LIKE '%{query}%'"
+        "--where", f"display_name LIKE '%{safe_query}%'"
     ])
     if adb_res.get("success"):
         return json.dumps({"source": "adb_contacts", "raw": adb_res.get("stdout")}, indent=2)
@@ -340,6 +492,8 @@ def handle_device_logs(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_radio_silence(params: Dict[str, Any], **kwargs) -> str:
     """Toggle full radio silence."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_radio_silence")
     enable = params.get("enable", True)
     bridge = get_bridge()
 
@@ -362,9 +516,23 @@ def handle_radio_silence(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_camera_snapshot(params: Dict[str, Any], **kwargs) -> str:
-    """Take instant camera photo."""
+    """Take instant camera photo (confined strictly to plugin data directory)."""
+    media_dir = os.path.realpath(os.path.join(get_plugin_data_dir(), "media"))
+    os.makedirs(media_dir, mode=0o700, exist_ok=True)
+
     camera = params.get("camera", "back")
-    dest = params.get("destination_path") or os.path.join(tempfile.gettempdir(), f"camera_{int(time.time())}.jpg")
+    raw_dest = params.get("destination_path")
+    if raw_dest and str(raw_dest).strip():
+        filename = os.path.basename(str(raw_dest).strip())
+        if not (filename.lower().endswith(".jpg") or filename.lower().endswith(".jpeg") or filename.lower().endswith(".png")):
+            filename = f"{filename}.jpg"
+    else:
+        filename = f"camera_{int(time.time())}.jpg"
+
+    dest = os.path.realpath(os.path.join(media_dir, filename))
+    if os.path.commonpath([dest, media_dir]) != media_dir:
+        dest = os.path.join(media_dir, f"camera_{int(time.time())}.jpg")
+
     bridge = get_bridge()
 
     res = bridge.send_request("api/v1/device/camera_snapshot", {"camera": camera})
@@ -395,6 +563,8 @@ def handle_location_get(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_device_alarm(params: Dict[str, Any], **kwargs) -> str:
     """Sound device buzzer / siren."""
+    if is_unattended_or_cron():
+        return _cron_refusal_json("android_device_alarm")
     duration = params.get("duration_seconds", 10)
     bridge = get_bridge()
     res = bridge.send_request("api/v1/device/alarm", {"duration_seconds": duration})

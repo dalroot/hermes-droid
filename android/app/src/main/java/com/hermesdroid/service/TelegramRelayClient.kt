@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.service
+package com.hermesdroid.service
 
 import android.content.Context
 import kotlinx.coroutines.*
@@ -7,16 +7,16 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import org.nous.hermesdroid.model.TelegramStatus
-import org.nous.hermesdroid.modules.AudioModule
-import org.nous.hermesdroid.modules.ContactsModule
-import org.nous.hermesdroid.modules.DeviceModule
-import org.nous.hermesdroid.modules.HermesAccessibilityService
-import org.nous.hermesdroid.modules.LocationModule
-import org.nous.hermesdroid.modules.MediaModule
-import org.nous.hermesdroid.modules.NotificationListener
-import org.nous.hermesdroid.modules.PackageInstallerModule
-import org.nous.hermesdroid.modules.TelephonyModule
+import com.hermesdroid.model.TelegramStatus
+import com.hermesdroid.modules.AudioModule
+import com.hermesdroid.modules.ContactsModule
+import com.hermesdroid.modules.DeviceModule
+import com.hermesdroid.modules.HermesAccessibilityService
+import com.hermesdroid.modules.LocationModule
+import com.hermesdroid.modules.MediaModule
+import com.hermesdroid.modules.NotificationListener
+import com.hermesdroid.modules.PackageInstallerModule
+import com.hermesdroid.modules.TelephonyModule
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -39,7 +39,7 @@ class TelegramRelayClient(
     private val mediaModule = MediaModule(context)
     private val contactsModule = ContactsModule(context)
     private val locationModule = LocationModule(context)
-    private val terminalModule = org.nous.hermesdroid.modules.TerminalModule(context)
+    private val terminalModule = com.hermesdroid.modules.TerminalModule(context)
     private val packageInstallerModule = PackageInstallerModule(context)
     private val audioModule = AudioModule(context)
 
@@ -567,7 +567,7 @@ class TelegramRelayClient(
                     if (xy.size >= 2) {
                         val x = xy[0].toFloatOrNull() ?: 500f
                         val y = xy[1].toFloatOrNull() ?: 500f
-                        val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.clickCoordinate(x, y)
+                        val ok = com.hermesdroid.modules.HermesAccessibilityService.clickCoordinate(x, y)
                         sendTelegramMessage(token, chatId, if (ok) "👆 Clicked ($x, $y) successfully." else "⚠️ Accessibility service disabled or failed.")
                         HermesNodeService.recordTask("Tap ($x, $y)", "TELEGRAM", if (ok) "SUCCESS" else "FAILED", System.currentTimeMillis() - startTime)
                     } else {
@@ -576,28 +576,28 @@ class TelegramRelayClient(
                 }
 
                 "/type" -> {
-                    val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.inputText(argument)
+                    val ok = com.hermesdroid.modules.HermesAccessibilityService.inputText(argument)
                     sendTelegramMessage(token, chatId, if (ok) "⌨️ Typed '$argument' into focused field." else "⚠️ Failed to type text. Ensure an input field is focused.")
                     HermesNodeService.recordTask("Type text", "TELEGRAM", if (ok) "SUCCESS" else "FAILED", System.currentTimeMillis() - startTime)
                 }
 
                 "/home" -> {
-                    val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.pressHome()
+                    val ok = com.hermesdroid.modules.HermesAccessibilityService.pressHome()
                     sendTelegramMessage(token, chatId, if (ok) "🏠 Pressed HOME button." else "⚠️ Accessibility disabled.")
                 }
 
                 "/back" -> {
-                    val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.pressBack()
+                    val ok = com.hermesdroid.modules.HermesAccessibilityService.pressBack()
                     sendTelegramMessage(token, chatId, if (ok) "◀️ Pressed BACK button." else "⚠️ Accessibility disabled.")
                 }
 
                 "/quick_settings" -> {
-                    val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.openQuickSettings()
+                    val ok = com.hermesdroid.modules.HermesAccessibilityService.openQuickSettings()
                     sendTelegramMessage(token, chatId, if (ok) "⚙️ Opened Quick Settings." else "⚠️ Accessibility disabled.")
                 }
 
                 "/screenshot" -> {
-                    val ok = org.nous.hermesdroid.modules.HermesAccessibilityService.takeScreenshot()
+                    val ok = com.hermesdroid.modules.HermesAccessibilityService.takeScreenshot()
                     sendTelegramMessage(token, chatId, if (ok) "📸 System screenshot captured." else "⚠️ Screenshot requires Android 9+ and Accessibility.")
                 }
 

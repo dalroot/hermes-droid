@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.ui
+package com.hermesdroid.ui
 
 import android.Manifest
 import android.content.ClipData
@@ -39,14 +39,14 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.nous.hermesdroid.model.LogLevel
-import org.nous.hermesdroid.model.NodeLogEntry
-import org.nous.hermesdroid.model.TaskEntry
-import org.nous.hermesdroid.model.TelegramStatus
-import org.nous.hermesdroid.modules.HermesAccessibilityService
-import org.nous.hermesdroid.modules.NotificationListener
-import org.nous.hermesdroid.service.HermesNodeService
-import org.nous.hermesdroid.ui.theme.HermesDroidTheme
+import com.hermesdroid.model.LogLevel
+import com.hermesdroid.model.NodeLogEntry
+import com.hermesdroid.model.TaskEntry
+import com.hermesdroid.model.TelegramStatus
+import com.hermesdroid.modules.HermesAccessibilityService
+import com.hermesdroid.modules.NotificationListener
+import com.hermesdroid.service.HermesNodeService
+import com.hermesdroid.ui.theme.HermesDroidTheme
 import java.lang.ref.WeakReference
 import java.text.SimpleDateFormat
 import java.util.*
@@ -421,7 +421,7 @@ fun MainAppScreen(
 @Composable
 fun StatusSubBanner(
     isRunning: Boolean,
-    mqttStatus: org.nous.hermesdroid.model.MqttStatus,
+    mqttStatus: com.hermesdroid.model.MqttStatus,
     telegramStatus: TelegramStatus
 ) {
     Surface(
@@ -467,8 +467,8 @@ fun StatusSubBanner(
 @Composable
 fun DashboardTab(
     isRunning: Boolean,
-    pairingStatus: org.nous.hermesdroid.model.PairingStatus,
-    mqttStatus: org.nous.hermesdroid.model.MqttStatus,
+    pairingStatus: com.hermesdroid.model.PairingStatus,
+    mqttStatus: com.hermesdroid.model.MqttStatus,
     telegramStatus: TelegramStatus,
     mqttBrokerHost: String,
     mqttBrokerPort: Int
@@ -1366,7 +1366,7 @@ fun PermissionsTab(
 fun RelayTab(
     mqttHost: String,
     mqttPort: Int,
-    mqttStatus: org.nous.hermesdroid.model.MqttStatus,
+    mqttStatus: com.hermesdroid.model.MqttStatus,
     telegramToken: String,
     telegramStatus: TelegramStatus
 ) {

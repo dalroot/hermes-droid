@@ -1,11 +1,11 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Telephony
 import android.telephony.SmsManager
-import org.nous.hermesdroid.model.SmsItem
+import com.hermesdroid.model.SmsItem
 
 class TelephonyModule(private val context: Context) {
 

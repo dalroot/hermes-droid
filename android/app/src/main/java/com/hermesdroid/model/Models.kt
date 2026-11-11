@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.model
+package com.hermesdroid.model
 
 data class ApiResponse<T>(
     val success: Boolean,

@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.Manifest
 import android.annotation.SuppressLint

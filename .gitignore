@@ -5,6 +5,9 @@ build/
 **/.gradle/
 *.apk
 *.aab
+*.jar
+gradle-wrapper.jar
+android/gradle/wrapper/gradle-wrapper.jar
 dist/
 release/
 
@@ -41,3 +44,4 @@ __pycache__/
 Thumbs.db
 *.tmp
 *.log
+TEKNIUS_REVIEW_TASKS.md

@@ -23,7 +23,7 @@ To evaluate system security and systematically remediate identifiable implementa
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **SEC-01** | **CWE-798:** Bot Token Exposure | **High (7.8)** | Injected via `local.properties` into `BuildConfig` *(Token still existed in APK bytecode)* | `DEFAULT_TELEGRAM_TOKEN` purged from Release APK bytecode (`classes.dex`). Dynamic storage strictly in private `Context.MODE_PRIVATE` SharedPreferences. | **PASS** |
 | **SEC-02** | **CWE-306:** Telegram Authentication Gate | **Critical (9.1)** | Whitelist pairing via `/pair <code>` *(No TTL, no brute-force lockout, unlimited attempts)* | 10-minute OTP expiration enforced; 3-attempt brute-force lockout with 5m cooldown & automatic code burning; unauthorized users blocked from commands and APK downloads. | **PASS** |
-| **SEC-03** | **CWE-494:** OTA Integrity & Verification | **High (8.8)** | HTTPS required + Host whitelist *(SHA-256 was optional; missing hash allowed install)* | Mandatory SHA-256 checksum enforced (missing hash rejected); pre-flight package name check (`org.nous.hermesdroid`) and signing certificate matching prior to `PackageInstaller`. | **PASS** |
+| **SEC-03** | **CWE-494:** OTA Integrity & Verification | **High (8.8)** | HTTPS required + Host whitelist *(SHA-256 was optional; missing hash allowed install)* | Mandatory SHA-256 checksum enforced (missing hash rejected); pre-flight package name check (`com.hermesdroid`) and signing certificate matching prior to `PackageInstaller`. | **PASS** |
 | **SEC-04** | **CWE-200:** Pairing Code Exposure | **Medium (6.5)** | OTP code removed from public announce MQTT payload | Maintained; pairing code strictly generated and rendered on the physical device screen. | **PASS** |
 | **SEC-05** | **CWE-306:** Embedded Web Server Access | **Medium (5.3)** | Route authentication added *(Accepted `?token=` query param; bound to 0.0.0.0 without TLS)* | Query-string tokens completely removed; strict `X-Hermes-Token` header verification with constant-time comparison; fail-closed behavior; documented local ADB bind scope. | **PASS** |
 | **SEC-06** | **CWE-538:** Insecure ADB Backup | **Low (4.3)** | `android:allowBackup="false"` configured | Verified in compiled manifest; physical ADB extraction blocked. | **PASS** |
@@ -71,7 +71,7 @@ An independent adversarial review identified critical architectural gaps in the 
 - **Mandatory OTA Checksum & Certificate Pre-flight:**
   - `MqttRelayClient.kt` throws `SecurityException` if `sha256` is missing or empty.
   - `hdroid install` automatically computes SHA-256 before issuing the command.
-  - Before invoking `PackageInstaller`, the APK package name is verified to match `org.nous.hermesdroid`, and the signing certificate is matched against the running application's signature.
+  - Before invoking `PackageInstaller`, the APK package name is verified to match `com.hermesdroid`, and the signing certificate is matched against the running application's signature.
 - **Header-Only HTTP Authentication:**
   - Removed `session.parms["token"]`. Requests must supply header `X-Hermes-Token`.
   - Token comparison utilizes `MessageDigest.isEqual` to prevent timing attacks.

@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.app.Notification
 import android.app.RemoteInput
@@ -6,7 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import org.nous.hermesdroid.model.NotificationPayload
+import com.hermesdroid.model.NotificationPayload
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 

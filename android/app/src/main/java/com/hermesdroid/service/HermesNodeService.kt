@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.service
+package com.hermesdroid.service
 
 import android.app.AlarmManager
 import android.app.NotificationChannel
@@ -15,13 +15,13 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.nous.hermesdroid.model.MqttStatus
-import org.nous.hermesdroid.model.NodeLogEntry
-import org.nous.hermesdroid.model.PairingStatus
-import org.nous.hermesdroid.model.TaskEntry
-import org.nous.hermesdroid.model.TelegramStatus
-import org.nous.hermesdroid.modules.DeviceModule
-import org.nous.hermesdroid.ui.MainActivity
+import com.hermesdroid.model.MqttStatus
+import com.hermesdroid.model.NodeLogEntry
+import com.hermesdroid.model.PairingStatus
+import com.hermesdroid.model.TaskEntry
+import com.hermesdroid.model.TelegramStatus
+import com.hermesdroid.modules.DeviceModule
+import com.hermesdroid.ui.MainActivity
 import java.security.SecureRandom
 
 class HermesNodeService : Service() {
@@ -57,7 +57,7 @@ class HermesNodeService : Service() {
             acquireScreenWakeLock()
         }
         val savedToken = prefs.getString("telegram_token", null)
-        val defaultToken = try { org.nous.hermesdroid.BuildConfig.DEFAULT_TELEGRAM_TOKEN } catch (_: Exception) { "" }
+        val defaultToken = try { com.hermesdroid.BuildConfig.DEFAULT_TELEGRAM_TOKEN } catch (_: Exception) { "" }
         val token = when {
             !savedToken.isNullOrBlank() -> savedToken
             defaultToken.isNotBlank() -> defaultToken
@@ -118,7 +118,7 @@ class HermesNodeService : Service() {
         if (shouldRun && !userRequestedStop) {
             addLog("SERVICE", "App swiped from recents. Scheduling persistent instant restart...")
             val restartIntent = Intent(applicationContext, BootReceiver::class.java).apply {
-                action = "org.nous.hermesdroid.RESTART_SERVICE"
+                action = "com.hermesdroid.RESTART_SERVICE"
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 applicationContext,
@@ -145,7 +145,7 @@ class HermesNodeService : Service() {
         val shouldRun = prefs.getBoolean("service_enabled", true)
         if (shouldRun && !userRequestedStop) {
             val restartIntent = Intent(applicationContext, BootReceiver::class.java).apply {
-                action = "org.nous.hermesdroid.RESTART_SERVICE"
+                action = "com.hermesdroid.RESTART_SERVICE"
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 applicationContext,
@@ -373,7 +373,7 @@ class HermesNodeService : Service() {
         val tasks: StateFlow<List<TaskEntry>> = _tasks.asStateFlow()
 
         private val _telegramToken = MutableStateFlow(
-            try { org.nous.hermesdroid.BuildConfig.DEFAULT_TELEGRAM_TOKEN } catch (_: Exception) { "" }
+            try { com.hermesdroid.BuildConfig.DEFAULT_TELEGRAM_TOKEN } catch (_: Exception) { "" }
         )
         val telegramToken: StateFlow<String> = _telegramToken.asStateFlow()
 

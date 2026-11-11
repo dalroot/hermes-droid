@@ -2,7 +2,7 @@
 
 Supports:
 1. Dedicated MQTT Broker over TLS/TCP with sub-100ms round-trip.
-2. Full native pairing integration with Hermes Agent's PairingStore (gateway.pairing).
+2. Isolated, tamper-proof device registry stored in plugin data directory.
 3. Direct ADB CLI fallback if MQTT client is unreachable.
 """
 
@@ -14,60 +14,194 @@ import os
 import secrets
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger("hermes_droid.bridge")
 
-def _get_default_config() -> tuple[str, int, str]:
-    """Retrieve MQTT broker config from environment or ~/.hermes/.env fallback."""
-    broker = os.environ.get("HERMES_DROID_BROKER")
-    port_str = os.environ.get("HERMES_DROID_PORT")
-    device_id = os.environ.get("HERMES_DROID_DEVICE_ID")
+DEFAULT_BROKER = "127.0.0.1"
+DEFAULT_PORT = 1883
+DEFAULT_DEVICE_ID = ""
 
-    if not (broker and port_str and device_id):
-        env_file = os.path.expanduser("~/.hermes/.env")
-        if os.path.isfile(env_file):
-            try:
-                with open(env_file, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith("#") or "=" not in line:
-                            continue
-                        k, v = line.split("=", 1)
-                        k = k.strip()
-                        v = v.strip().strip('"').strip("'")
-                        if k == "HERMES_DROID_BROKER" and not broker:
-                            broker = v
-                        elif k == "HERMES_DROID_PORT" and not port_str:
-                            port_str = v
-                        elif k == "HERMES_DROID_DEVICE_ID" and not device_id:
-                            device_id = v
-            except Exception as e:
-                logger.debug(f"Could not parse ~/.hermes/.env: {e}")
 
-    return (
-        broker or "127.0.0.1",
-        int(port_str or "1883"),
-        device_id or "",
+def is_loopback_host(host: str) -> bool:
+    """Return True if host is a local loopback address (127.0.0.1, localhost, ::1)."""
+    h = (host or "").strip().lower()
+    if h in ("127.0.0.1", "localhost", "::1", "localhost.localdomain"):
+        return True
+    try:
+        import ipaddress
+
+        ip = ipaddress.ip_address(h)
+        return ip.is_loopback
+    except ValueError:
+        return False
+
+
+def get_plugin_secret(name: str, default: Optional[str] = None) -> Optional[str]:
+    """Resolve credential via Hermes public agent.secret_scope.get_secret.
+
+    Respects active profile isolation under multiplexing. Falls back to os.environ
+    only when running isolated unit tests without the Hermes runtime package installed.
+    Never bypasses UnscopedSecretError: if Hermes is running under multiplexing
+    without an active scope, get_secret raises UnscopedSecretError (fail-closed).
+    """
+    try:
+        from agent.secret_scope import get_secret
+    except ImportError:
+        return os.environ.get(name, default)
+
+    return get_secret(name, default)
+
+
+def get_plugin_data_dir() -> str:
+    """Return isolated data directory for hermes-droid with strict permissions (0700)."""
+    base_dir = os.environ.get(
+        "HERMES_PLUGIN_DATA",
+        os.path.expanduser("~/.hermes/plugin-data/hermes-droid"),
     )
+    os.makedirs(base_dir, mode=0o700, exist_ok=True)
+    return base_dir
 
 
-DEFAULT_BROKER, DEFAULT_PORT, DEFAULT_DEVICE_ID = _get_default_config()
+class DeviceRegistry:
+    """Manages trusted/approved paired devices in the plugin's isolated data dir.
+
+    Security guarantees:
+    - Never automatically registers or trusts devices from unauthenticated MQTT packets.
+    - Atomic writes with restrictive 0600 file permissions and directory fsync.
+    - Symlink protection: refuses to read/write through symbolic links.
+    - Safe error handling for missing/corrupted registry files.
+    """
+
+    def __init__(self, data_dir: Optional[str] = None):
+        self.data_dir = data_dir or get_plugin_data_dir()
+        self.registry_file = os.path.join(self.data_dir, "paired_devices.json")
+        self._lock = threading.Lock()
+
+    def _read_registry(self) -> Dict[str, Any]:
+        if os.path.islink(self.registry_file):
+            logger.error(f"Security alert: registry file '{self.registry_file}' is a symlink! Refusing to read.")
+            return {}
+        if not os.path.isfile(self.registry_file):
+            return {}
+        try:
+            with open(self.registry_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except Exception as e:
+            logger.warning(f"Failed to read device registry from {self.registry_file}: {e}")
+            return {}
+
+    def is_approved(self, device_id: str) -> bool:
+        if not device_id:
+            return False
+        with self._lock:
+            data = self._read_registry()
+            dev_entry = data.get(device_id)
+            if isinstance(dev_entry, dict):
+                return bool(dev_entry.get("approved", False))
+            elif isinstance(dev_entry, bool):
+                return dev_entry
+            return False
+
+    def list_approved_devices(self) -> list[str]:
+        with self._lock:
+            data = self._read_registry()
+            approved = []
+            for dev_id, info in data.items():
+                if isinstance(info, dict) and info.get("approved"):
+                    approved.append(dev_id)
+                elif info is True:
+                    approved.append(dev_id)
+            return approved
+
+    def approve_device(self, device_id: str, model: str = "") -> bool:
+        """Explicitly approve a device in the local registry.
+
+        ADMINISTRATIVE ONLY:
+        This method must only be invoked via explicit administrator/user configuration
+        or verified local setup workflows. It is NEVER exposed to LLM tools, hooks,
+        or incoming MQTT message handlers.
+        """
+        if not device_id:
+            return False
+        with self._lock:
+            data = self._read_registry()
+            data[device_id] = {
+                "approved": True,
+                "model": model,
+                "updated_at": time.time(),
+            }
+            return self._write_registry_atomic(data)
+
+    def revoke_device(self, device_id: str) -> bool:
+        """Revoke a previously approved device."""
+        with self._lock:
+            data = self._read_registry()
+            if device_id in data:
+                del data[device_id]
+                return self._write_registry_atomic(data)
+            return True
+
+    def _write_registry_atomic(self, data: Dict[str, Any]) -> bool:
+        os.makedirs(self.data_dir, mode=0o700, exist_ok=True)
+        if os.path.islink(self.registry_file):
+            logger.error(f"Security alert: registry target '{self.registry_file}' is a symlink! Refusing to write.")
+            return False
+
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=self.data_dir, prefix="paired_devices_", suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(tmp_path, 0o600)
+            os.replace(tmp_path, self.registry_file)
+
+            # On POSIX, fsync the containing directory to ensure directory entry rename durability
+            try:
+                dir_fd = os.open(self.data_dir, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except Exception as e:
+                logger.debug(f"Directory fsync not supported or failed: {e}")
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to write device registry atomically: {e}")
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            return False
 
 
 class AndroidBridge:
     def __init__(
         self,
         broker_host: Optional[str] = None,
-        broker_port: int = DEFAULT_PORT,
+        broker_port: Optional[int] = None,
         device_id: Optional[str] = None,
+        tls_enabled: Optional[bool] = None,
+        allowed_apk_dir: Optional[str] = None,
+        mqtt_user: Optional[str] = None,
+        mqtt_password: Optional[str] = None,
     ):
-        self.broker = broker_host or os.environ.get("HERMES_DROID_BROKER", DEFAULT_BROKER)
-        self.port = int(os.environ.get("HERMES_DROID_PORT", str(broker_port)))
-        self.device_id = device_id or os.environ.get("HERMES_DROID_DEVICE_ID", DEFAULT_DEVICE_ID)
+        self.broker = (broker_host or DEFAULT_BROKER).strip() or DEFAULT_BROKER
+        self.port = int(broker_port if broker_port is not None else DEFAULT_PORT)
+        self.device_id = (device_id if device_id is not None else DEFAULT_DEVICE_ID).strip()
+        self.tls_enabled = bool(tls_enabled) if tls_enabled is not None else False
+        self.allowed_apk_dir = (allowed_apk_dir or "").strip()
+        self._explicit_mqtt_user = mqtt_user
+        self._explicit_mqtt_password = mqtt_password
         self.adb_bin = shutil.which("adb")
+        self._registry = DeviceRegistry()
 
         # In-flight request correlation: reqId -> (threading.Event, response_dict)
         self._pending_requests: Dict[str, tuple[threading.Event, Dict[str, Any]]] = {}
@@ -76,15 +210,64 @@ class AndroidBridge:
         self._is_connected = False
         self._init_mqtt()
 
+    def get_mqtt_credentials(self) -> tuple[Optional[str], Optional[str]]:
+        """Resolve MQTT broker credentials via Hermes agent.secret_scope."""
+        user = self._explicit_mqtt_user
+        if user is None:
+            user = get_plugin_secret("HERMES_DROID_MQTT_USER")
+        password = self._explicit_mqtt_password
+        if password is None:
+            password = get_plugin_secret("HERMES_DROID_MQTT_PASSWORD")
+        clean_user = user.strip() if isinstance(user, str) and user.strip() else None
+        clean_pass = password if isinstance(password, str) and password != "" else None
+        return clean_user, clean_pass
+
+    def close(self) -> None:
+        """Stop MQTT background loop and disconnect cleanly."""
+        client = self._mqtt_client
+        self._mqtt_client = None
+        self._is_connected = False
+        if client is not None:
+            try:
+                client.loop_stop()
+            except Exception:
+                pass
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+
     def _init_mqtt(self):
         try:
             import paho.mqtt.client as mqtt
+
+            is_local = is_loopback_host(self.broker)
+            mqtt_user, mqtt_password = self.get_mqtt_credentials()
+
+            # Item #5: Enforce TLS and authentication for all non-loopback brokers
+            if not is_local:
+                if not self.tls_enabled:
+                    raise ValueError(
+                        f"Insecure connection refused: Non-loopback MQTT broker '{self.broker}' requires TLS encryption. "
+                        "Set tls_enabled: true in plugin configuration."
+                    )
+                if not mqtt_user or not mqtt_password:
+                    raise ValueError(
+                        f"Unauthenticated connection refused: Non-loopback MQTT broker '{self.broker}' requires credentials. "
+                        "Set HERMES_DROID_MQTT_USER and HERMES_DROID_MQTT_PASSWORD in your environment/credentials."
+                    )
 
             client_id = f"hermes_bridge_{secrets.token_hex(4)}"
             try:
                 self._mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
             except AttributeError:
                 self._mqtt_client = mqtt.Client(client_id=client_id)
+
+            if self.tls_enabled:
+                self._mqtt_client.tls_set()
+
+            if mqtt_user:
+                self._mqtt_client.username_pw_set(mqtt_user, mqtt_password)
 
             self._mqtt_client.on_connect = self._on_connect
             self._mqtt_client.on_message = self._on_message
@@ -93,16 +276,30 @@ class AndroidBridge:
             self._mqtt_client.connect_async(self.broker, self.port, keepalive=30)
             self._mqtt_client.loop_start()
         except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            try:
+                from agent.secret_scope import UnscopedSecretError
+                if isinstance(e, UnscopedSecretError):
+                    raise
+            except ImportError:
+                pass
             logger.warning(f"MQTT init failed, fallback available: {e}")
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         rc_code = rc if isinstance(rc, int) else getattr(rc, "value", 0)
         if rc_code == 0:
             self._is_connected = True
-            res_topic = f"hermes/node/{self.device_id}/res"
-            announce_topic = "hermes/node/announce"
-            client.subscribe([(res_topic, 1), (announce_topic, 1)])
-            logger.info(f"Connected to MQTT broker {self.broker}:{self.port}, subscribed to {res_topic}")
+            subscriptions = []
+            if self.device_id:
+                res_topic = f"hermes/node/{self.device_id}/res"
+                subscriptions.append((res_topic, 1))
+            # Security: We deliberately do NOT subscribe to unauthenticated announce topics.
+            if subscriptions:
+                client.subscribe(subscriptions)
+                logger.info(f"Connected to MQTT broker {self.broker}:{self.port}, subscribed to {[s[0] for s in subscriptions]}")
+            else:
+                logger.info(f"Connected to MQTT broker {self.broker}:{self.port} (no device configured yet)")
         else:
             logger.warning(f"MQTT connect returned rc={rc_code}")
 
@@ -112,99 +309,70 @@ class AndroidBridge:
 
     def _on_message(self, client, userdata, msg):
         try:
-            payload = json.loads(msg.payload.decode("utf-8"))
             topic = msg.topic
-
             if topic == "hermes/node/announce":
-                self._handle_announce(payload)
+                logger.info(
+                    "Received MQTT announce message; automatic enrollment is disabled for security. "
+                    "Devices must be explicitly configured."
+                )
+                return
+
+            expected_topic = f"hermes/node/{self.device_id}/res" if self.device_id else None
+            if not expected_topic or topic != expected_topic:
+                logger.warning(f"Dropping MQTT message from unauthorized or unexpected topic: {topic}")
+                return
+
+            try:
+                payload = json.loads(msg.payload.decode("utf-8"))
+            except Exception as e:
+                logger.warning(f"Dropping malformed JSON payload from {topic}: {e}")
+                return
+
+            if not isinstance(payload, dict):
+                logger.warning(f"Dropping non-dict payload from {topic}")
+                return
+
+            # Fail-closed validation: deviceId must be present, non-empty, match configured device_id, and be approved.
+            msg_dev_id = payload.get("deviceId")
+            if not msg_dev_id or msg_dev_id != self.device_id or not self.is_device_approved(msg_dev_id):
+                logger.warning(f"Dropping MQTT message: invalid, missing, or unapproved deviceId '{msg_dev_id}'")
                 return
 
             req_id = payload.get("reqId")
+            if not req_id or not isinstance(req_id, str):
+                logger.warning(f"Dropping MQTT message: missing or invalid reqId '{req_id}'")
+                return
+
+            # Atomic single-delivery: pop the pending request so it cannot be matched again.
             with self._lock:
-                if req_id and req_id in self._pending_requests:
-                    event, container = self._pending_requests[req_id]
-                    container.update(payload)
-                    event.set()
+                pending = self._pending_requests.pop(req_id, None)
+
+            if pending is None:
+                logger.warning(f"Dropping MQTT message: reqId '{req_id}' is unknown, expired, or already completed")
+                return
+
+            event, container = pending
+            container.update(payload)
+            event.set()
         except Exception as e:
             logger.debug(f"Error handling MQTT message: {e}")
 
-    def _handle_announce(self, payload: dict):
-        """Auto-register unapproved nodes into Hermes PairingStore."""
-        dev_id = payload.get("deviceId")
-        pairing_code = payload.get("pairingCode")
-        model = payload.get("model", "Android Node")
-        if dev_id and pairing_code and not self.is_device_approved(dev_id):
-            self.register_pending_code(dev_id, pairing_code, model)
-
-    # -------------------------------------------------------------
-    # PairingStore Integration
-    # -------------------------------------------------------------
-    def _get_pairing_store(self):
-        pkg_name = "".join(["gate", "way", ".", "pair", "ing"])
-        try:
-            import importlib
-            mod = importlib.import_module(pkg_name)
-            cls = getattr(mod, "PairingStore", None)
-            return cls() if cls else None
-        except Exception:
-            try:
-                import importlib
-                import sys
-                hermes_root = os.environ.get("HERMES_AGENT_ROOT", os.path.expanduser("~/.hermes/hermes-agent"))
-                if os.path.isdir(hermes_root) and hermes_root not in sys.path:
-                    sys.path.insert(0, hermes_root)
-                mod = importlib.import_module(pkg_name)
-                cls = getattr(mod, "PairingStore", None)
-                return cls() if cls else None
-            except Exception as e:
-                logger.debug(f"PairingStore not available: {e}")
-                return None
-
     def is_device_approved(self, device_id: Optional[str] = None) -> bool:
-        dev_id = device_id or self.device_id
-        store = self._get_pairing_store()
-        if store:
-            try:
-                return store.is_approved("android", dev_id)
-            except Exception as e:
-                logger.debug(f"PairingStore check failed: {e}")
-        return False
-
-    def register_pending_code(self, device_id: str, code: str, model: str = "Xiaomi Redmi Note 8") -> bool:
-        """Register a pairing code into Hermes native PairingStore."""
-        store = self._get_pairing_store()
-        if not store:
+        dev_id = (device_id or self.device_id or "").strip()
+        if not dev_id:
             return False
-
-        try:
-            clean_code = "".join(str(code or "").upper().split())
-            salt = os.urandom(16)
-            path = store._pending_path("android")
-
-            with store._locked():
-                pending = store._load_json(path)
-                # Keep max 3 entries
-                if len(pending) >= 3:
-                    oldest = min(pending.keys(), key=lambda k: pending[k].get("created_at", 0))
-                    del pending[oldest]
-                entry_id = secrets.token_hex(8)
-                pending[entry_id] = {
-                    "hash": store._hash_code(clean_code, salt),
-                    "salt": salt.hex(),
-                    "user_id": device_id,
-                    "user_name": model,
-                    "created_at": time.time(),
-                }
-                store._save_json(path, pending)
-            logger.info(f"Registered pairing request for {device_id} in Hermes PairingStore")
+        # Explicitly configured device in plugin settings is trusted
+        if self.device_id and dev_id == self.device_id:
             return True
-        except Exception as e:
-            logger.error(f"Failed to register pending code in PairingStore: {e}")
-            return False
+        return self._registry.is_approved(dev_id)
 
-    def notify_node_approved(self, device_id: Optional[str] = None, approver: str = "Hermes Gateway"):
+    def notify_node_approved(self, device_id: Optional[str] = None, approver: str = "Hermes Plugin"):
         """Notify the physical Android node that it has been approved."""
         dev_id = device_id or self.device_id
+        if not dev_id or not self.is_device_approved(dev_id):
+            logger.warning(f"Refusing to send approval notification to unapproved device: {dev_id}")
+            return
+
         topic = f"hermes/node/{dev_id}/pair/approve"
         payload = {
             "type": "PAIR_APPROVE",
@@ -220,13 +388,19 @@ class AndroidBridge:
     # -------------------------------------------------------------
     def send_command(self, action: str, params: Optional[Dict[str, Any]] = None, timeout: float = 12.0) -> Dict[str, Any]:
         """Send command over MQTT to the companion Android node."""
+        if not self.device_id or not self.is_device_approved(self.device_id):
+            return {
+                "success": False,
+                "error": f"Device '{self.device_id}' is not configured or not approved in hermes-droid.",
+            }
         if params is None:
             params = {}
 
-        req_id = f"cmd_{int(time.time() * 1000)}_{secrets.token_hex(2)}"
+        req_id = f"cmd_{int(time.time() * 1000)}_{secrets.token_hex(8)}"
         cmd_topic = f"hermes/node/{self.device_id}/cmd"
         payload = {
             "reqId": req_id,
+            "deviceId": self.device_id,
             "action": action,
             "params": params,
         }
@@ -323,12 +497,37 @@ class AndroidBridge:
         }
 
 
-# Global default bridge instance
+# Global default bridge instance and configuration
 _bridge_instance: Optional[AndroidBridge] = None
+_bridge_config: Dict[str, Any] = {}
+_bridge_lock = threading.Lock()
+
+
+def configure_bridge(
+    broker_host: Optional[str] = None,
+    broker_port: Optional[int] = None,
+    device_id: Optional[str] = None,
+    tls_enabled: Optional[bool] = None,
+    allowed_apk_dir: Optional[str] = None,
+) -> None:
+    """Apply settings resolved from ctx.get_config() and reset active bridge instance."""
+    global _bridge_instance, _bridge_config
+    with _bridge_lock:
+        _bridge_config = {
+            "broker_host": broker_host,
+            "broker_port": broker_port,
+            "device_id": device_id,
+            "tls_enabled": tls_enabled,
+            "allowed_apk_dir": allowed_apk_dir,
+        }
+        if _bridge_instance is not None:
+            _bridge_instance.close()
+            _bridge_instance = None
 
 
 def get_bridge() -> AndroidBridge:
     global _bridge_instance
-    if _bridge_instance is None:
-        _bridge_instance = AndroidBridge()
-    return _bridge_instance
+    with _bridge_lock:
+        if _bridge_instance is None:
+            _bridge_instance = AndroidBridge(**_bridge_config)
+        return _bridge_instance

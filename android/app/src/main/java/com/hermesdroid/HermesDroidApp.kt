@@ -1,4 +1,4 @@
-package org.nous.hermesdroid
+package com.hermesdroid
 
 import android.app.Application
 

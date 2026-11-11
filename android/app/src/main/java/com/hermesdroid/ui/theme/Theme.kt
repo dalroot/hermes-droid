@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.ui.theme
+package com.hermesdroid.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

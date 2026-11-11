@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.app.ActivityManager
 import android.content.ClipData
@@ -15,7 +15,7 @@ import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
-import org.nous.hermesdroid.model.DeviceStatus
+import com.hermesdroid.model.DeviceStatus
 import java.net.Inet4Address
 import java.net.NetworkInterface
 

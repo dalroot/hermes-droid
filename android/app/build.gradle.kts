@@ -16,11 +16,11 @@ val defaultTelegramToken = (localProperties.getProperty("HERMES_TELEGRAM_BOT_TOK
     ?: "").trim()
 
 android {
-    namespace = "org.nous.hermesdroid"
+    namespace = "com.hermesdroid"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.nous.hermesdroid"
+        applicationId = "com.hermesdroid"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

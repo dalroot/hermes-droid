@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.content.Context
 import android.content.Intent

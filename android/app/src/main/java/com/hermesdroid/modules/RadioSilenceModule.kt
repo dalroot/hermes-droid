@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.modules
+package com.hermesdroid.modules
 
 import android.bluetooth.BluetoothAdapter
 import android.content.Context

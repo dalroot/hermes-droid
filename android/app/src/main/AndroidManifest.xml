@@ -87,7 +87,7 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="org.nous.hermesdroid.RESTART_SERVICE" />
+                <action android:name="com.hermesdroid.RESTART_SERVICE" />
             </intent-filter>
         </receiver>
 

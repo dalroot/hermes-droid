@@ -138,7 +138,10 @@ Hermes Droid supports two operational modes depending on deployment topology:
 ### 1. Build and Run the Android Node
 1. Compile the hardened Release APK:
    ```bash
-   cd hermes-droid/android && ./gradlew assembleRelease
+   cd hermes-droid/android
+   # Generate wrapper if needed on a clean checkout (untracked for security compliance):
+   # gradle wrapper
+   ./gradlew assembleRelease
    ```
 2. Install onto the device via ADB:
    ```bash
@@ -214,7 +217,7 @@ Hermes Droid incorporates an over-the-air package update pipeline designed to si
 3. **Cryptographic Validation Gate:**
    - The device strictly enforces the `sha256` parameter; requests lacking a checksum are rejected immediately.
    - The SHA-256 digest is verified on the downloaded stream before PackageInstaller is invoked.
-   - Package name (`org.nous.hermesdroid`) and cryptographic signing certificates are validated against the active application.
+   - Package name (`com.hermesdroid`) and cryptographic signing certificates are validated against the active application.
 4. **Installer Initiation:** The app invokes Android's PackageInstaller session. Note: Depending on device OS policies, initial installation or updates may prompt the user or require Accessibility confirmation on the screen.
 
 ---

@@ -1,4 +1,4 @@
-package org.nous.hermesdroid.service
+package com.hermesdroid.service
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,8 +8,8 @@ import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.json.JSONArray
 import org.json.JSONObject
-import org.nous.hermesdroid.model.MqttStatus
-import org.nous.hermesdroid.modules.*
+import com.hermesdroid.model.MqttStatus
+import com.hermesdroid.modules.*
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
