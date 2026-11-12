@@ -56,12 +56,49 @@ def get_plugin_secret(name: str, default: Optional[str] = None) -> Optional[str]
     return get_secret(name, default)
 
 
-def get_plugin_data_dir() -> str:
-    """Return isolated data directory for hermes-droid with strict permissions (0700)."""
-    base_dir = os.environ.get(
-        "HERMES_PLUGIN_DATA",
-        os.path.expanduser("~/.hermes/plugin-data/hermes-droid"),
+def get_clean_adb_env() -> Dict[str, str]:
+    """Build a minimal, safe environment dictionary for child ADB processes.
+
+    Prevents leaking Hermes process environment (including provider API keys,
+    tokens, and sensitive session credentials) to external child processes.
+    Only copies essential variables when explicitly set in the host environment.
+    """
+    allowed_keys = (
+        "PATH",
+        "HOME",
+        "LANG",
+        "TMPDIR",
+        "ANDROID_HOME",
+        "ANDROID_SDK_ROOT",
+        "ADB_VENDOR_KEYS",
+        "ANDROID_ADB_SERVER_PORT",
+        "SYSTEMROOT",
+        "SystemDrive",
     )
+    clean_env: Dict[str, str] = {}
+    for key in allowed_keys:
+        val = os.environ.get(key)
+        if val is not None:
+            clean_env[key] = val
+    return clean_env
+
+
+def get_plugin_data_dir() -> str:
+    """Return isolated data directory for hermes-droid with strict permissions (0700).
+
+    Resolves via hermes_constants.get_hermes_home() to follow active Hermes profile,
+    falling back to standard ~/.hermes/plugin-data/hermes-droid or HERMES_PLUGIN_DATA override.
+    """
+    override = os.environ.get("HERMES_PLUGIN_DATA")
+    if override:
+        base_dir = override
+    else:
+        try:
+            from hermes_constants import get_hermes_home
+            base_dir = str(get_hermes_home() / "plugin-data" / "hermes-droid")
+        except ImportError:
+            base_dir = os.path.expanduser("~/.hermes/plugin-data/hermes-droid")
+
     os.makedirs(base_dir, mode=0o700, exist_ok=True)
     return base_dir
 
@@ -468,7 +505,13 @@ class AndroidBridge:
         cmd.extend(args)
 
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=get_clean_adb_env(),
+            )
             return {
                 "success": res.returncode == 0,
                 "exit_code": res.returncode,

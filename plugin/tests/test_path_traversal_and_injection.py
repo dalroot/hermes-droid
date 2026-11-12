@@ -362,5 +362,209 @@ class TestDependenciesAndSubprocessImport(unittest.TestCase):
         self.assertNotIn("urllib3>=", content)
 
 
+class TestAdbEnvironmentSanitization(unittest.TestCase):
+    """Test suite verifying minimal environment isolation for ADB subprocesses."""
+
+    def test_clean_adb_env_excludes_sensitive_keys(self):
+        """Sensitive process environment variables must NEVER leak into child ADB env."""
+        from plugin.bridge import get_clean_adb_env
+
+        sensitive_sample = {
+            "OPENAI_API_KEY": "sk-proj-secret-12345",
+            "ANTHROPIC_API_KEY": "sk-ant-secret-67890",
+            "HERMES_AGENT_TOKEN": "token-xyz-secret",
+            "AWS_SECRET_ACCESS_KEY": "aws-secret-test",
+            "DATABASE_URL": "postgres://user:pass@localhost:5432/db",
+        }
+        with patch.dict(os.environ, sensitive_sample, clear=False):
+            clean_env = get_clean_adb_env()
+            for key in sensitive_sample:
+                self.assertNotIn(key, clean_env, f"Sensitive key {key} leaked into child ADB env!")
+
+    def test_clean_adb_env_includes_essential_keys_when_set(self):
+        """Allowed ADB variables (PATH, ANDROID_HOME, etc.) are safely preserved when present."""
+        from plugin.bridge import get_clean_adb_env
+
+        safe_sample = {
+            "PATH": "/usr/bin:/bin",
+            "ANDROID_HOME": "/opt/android-sdk",
+            "ANDROID_SDK_ROOT": "/opt/android-sdk",
+            "TMPDIR": "/tmp/custom_tmp",
+            "ADB_VENDOR_KEYS": "/home/user/.android/adbkey",
+        }
+        with patch.dict(os.environ, safe_sample, clear=False):
+            clean_env = get_clean_adb_env()
+            for key, val in safe_sample.items():
+                self.assertEqual(clean_env.get(key), val)
+
+    def test_bridge_exec_adb_command_passes_clean_env(self):
+        """bridge.exec_adb_command must invoke subprocess.run with explicit clean env."""
+        from plugin.bridge import AndroidBridge
+
+        bridge = AndroidBridge(broker_host="127.0.0.1", broker_port=1883)
+        bridge.adb_bin = "/usr/bin/adb"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+            bridge.exec_adb_command(["get-state"])
+            mock_run.assert_called_once()
+            _, kwargs = mock_run.call_args
+            self.assertIn("env", kwargs)
+            passed_env = kwargs["env"]
+            self.assertIsInstance(passed_env, dict)
+            # Verify sensitive keys not present in kwargs["env"]
+            self.assertNotIn("OPENAI_API_KEY", passed_env)
+
+    def test_handle_take_screenshot_adb_screencap_passes_clean_env(self):
+        """handle_take_screenshot ADB fallback must pass clean env to subprocess.run."""
+        from plugin.handlers import handle_take_screenshot
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        bridge.adb_bin = "/usr/bin/adb"
+        with patch.object(bridge, "send_request", return_value={"success": False, "error": "offline"}):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0)
+                with patch("os.path.exists", return_value=True), patch("os.path.getsize", return_value=1024):
+                    handle_take_screenshot({})
+                    mock_run.assert_called_once()
+                    _, kwargs = mock_run.call_args
+                    self.assertIn("env", kwargs)
+                    passed_env = kwargs["env"]
+                    self.assertNotIn("OPENAI_API_KEY", passed_env)
+
+
+class TestAdbShellModelArgumentValidation(unittest.TestCase):
+    """Test suite verifying validation of model arguments reaching adb shell."""
+
+    def test_read_sms_rejects_non_integer_limit(self):
+        """Non-integer limit values (e.g. injected shell text) must be refused fail-closed."""
+        from plugin.handlers import handle_read_sms
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        with patch.object(bridge, "exec_adb_command") as mock_adb:
+            res_str = handle_read_sms({"limit": "5; rm -rf /data/local/tmp; #"})
+            res = json.loads(res_str)
+            self.assertIn("error", res)
+            self.assertIn("limit", res["error"].lower())
+            mock_adb.assert_not_called()
+
+    def test_read_sms_rejects_out_of_bounds_limit(self):
+        """Limits outside [1, 50] must be refused fail-closed."""
+        from plugin.handlers import handle_read_sms
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        with patch.object(bridge, "exec_adb_command") as mock_adb:
+            for invalid_val in (0, -1, 51, 1000):
+                res_str = handle_read_sms({"limit": invalid_val})
+                res = json.loads(res_str)
+                self.assertIn("error", res)
+                self.assertIn("between 1 and 50", res["error"])
+                mock_adb.assert_not_called()
+
+    def test_device_logs_rejects_invalid_buffer(self):
+        """Invalid log buffer names (injected shell text) must be refused fail-closed."""
+        from plugin.handlers import handle_device_logs
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        with patch.object(bridge, "exec_adb_command") as mock_adb:
+            res_str = handle_device_logs({"buffer": "system; reboot", "lines": 50})
+            res = json.loads(res_str)
+            self.assertFalse(res.get("success"))
+            self.assertIn("Invalid log buffer", res.get("error", ""))
+            mock_adb.assert_not_called()
+
+    def test_device_logs_accepts_valid_buffers(self):
+        """Valid buffer names (main, system, radio, crash, dumpsys) are allowed."""
+        from plugin.handlers import handle_device_logs
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        valid_buffers = ("main", "system", "radio", "crash", "dumpsys")
+        for buf in valid_buffers:
+            with patch.object(bridge, "send_request", return_value={"success": True, "data": []}):
+                res_str = handle_device_logs({"buffer": buf, "lines": 50})
+                res = json.loads(res_str)
+                self.assertEqual(res, [])
+
+    def test_device_logs_rejects_non_integer_or_out_of_bounds_lines(self):
+        """Lines argument must be strictly an integer bounded between 1 and 2000."""
+        from plugin.handlers import handle_device_logs
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        with patch.object(bridge, "exec_adb_command") as mock_adb:
+            for bad_lines in ("50; rm -rf /", 0, -5, 2001, 10000):
+                res_str = handle_device_logs({"buffer": "system", "lines": bad_lines})
+                res = json.loads(res_str)
+                self.assertFalse(res.get("success"))
+                self.assertIn("lines", res.get("error", "").lower())
+                mock_adb.assert_not_called()
+
+    def test_contacts_search_rejects_shell_metacharacters(self):
+        """Shell metacharacters ($(), backticks, pipes, redirection) must be rejected."""
+        from plugin.handlers import handle_contacts_search
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+        shell_payloads = [
+            "Alice$(reboot)",
+            "Bob`id`",
+            "Charlie | reboot",
+            "David & reboot",
+            "Eve; rm -rf /",
+            "Frank > /data/local/tmp/hack",
+            "Grace < /dev/null",
+            "Heidi\nreboot",
+        ]
+        with patch.object(bridge, "exec_adb_command") as mock_adb:
+            for payload in shell_payloads:
+                res_str = handle_contacts_search({"query": payload})
+                res = json.loads(res_str)
+                self.assertFalse(res.get("success"))
+                self.assertIn("forbidden in contacts search", res.get("error", ""))
+                mock_adb.assert_not_called()
+
+    def test_exact_verification_matrix(self):
+        """Verify the comprehensive security test matrix for Unicode names, injections, and edge types."""
+        from plugin.handlers import handle_contacts_search, handle_read_sms, handle_device_logs
+        from plugin.bridge import get_bridge
+
+        bridge = get_bridge()
+
+        # 1. Accepted Unicode and standard names
+        for safe_name in ("علی رضایی", "Alice", "Ali Smith"):
+            with patch.object(bridge, "send_request", return_value={"success": True, "data": []}):
+                res_str = handle_contacts_search({"query": safe_name})
+                res = json.loads(res_str)
+                self.assertEqual(res, [], f"Expected safe acceptance for '{safe_name}'")
+
+        # 2. Rejected injections in contacts
+        for attack in ("' OR 1=1 --", "$(id)", "Alice`id`", "Bob\nreboot"):
+            with patch.object(bridge, "exec_adb_command") as mock_adb:
+                res_str = handle_contacts_search({"query": attack})
+                res = json.loads(res_str)
+                self.assertFalse(res.get("success"), f"Attack '{attack}' must be rejected!")
+                mock_adb.assert_not_called()
+
+        # 3. Rejected boolean and float values for limit in read_sms
+        for bad_limit in (True, False, 12.7, "12.7", "True"):
+            with patch.object(bridge, "exec_adb_command") as mock_adb:
+                res_str = handle_read_sms({"limit": bad_limit})
+                res = json.loads(res_str)
+                self.assertIn("error", res, f"Limit {bad_limit!r} should be rejected!")
+                mock_adb.assert_not_called()
+
+        # 4. Rejected out of bounds (0 or 2001) and boolean for lines in device_logs
+        for bad_lines in (0, 2001, True, False, 12.7):
+            with patch.object(bridge, "exec_adb_command") as mock_adb:
+                res_str = handle_device_logs({"buffer": "system", "lines": bad_lines})
+                res = json.loads(res_str)
+                self.assertFalse(res.get("success"), f"Lines {bad_lines!r} should be rejected!")
+                mock_adb.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

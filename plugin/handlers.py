@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
-from .bridge import get_bridge, get_plugin_data_dir
+from .bridge import get_bridge, get_clean_adb_env, get_plugin_data_dir
 
 STATE_CHANGING_TOOLS = frozenset({
     "android_adb_shell",
@@ -23,6 +24,31 @@ STATE_CHANGING_TOOLS = frozenset({
 })
 
 
+def _parse_bounded_int(val: Any, min_val: int, max_val: int, param_name: str) -> Tuple[Optional[int], Optional[str]]:
+    """Parse and strictly validate an integer parameter, rejecting booleans, floats, and out-of-bounds values."""
+    if isinstance(val, bool):
+        return None, f"Parameter '{param_name}' must be an integer, not a boolean."
+    if isinstance(val, float):
+        return None, f"Parameter '{param_name}' must be an integer, not a float."
+    try:
+        if isinstance(val, str):
+            val_str = val.strip()
+            if not (val_str.isdigit() or (val_str.startswith("-") and val_str[1:].isdigit())):
+                return None, f"Parameter '{param_name}' must be a valid integer."
+            parsed = int(val_str)
+        elif isinstance(val, int):
+            parsed = val
+        else:
+            return None, f"Parameter '{param_name}' must be a valid integer."
+    except (ValueError, TypeError):
+        return None, f"Parameter '{param_name}' must be a valid integer."
+
+    if not (min_val <= parsed <= max_val):
+        return None, f"Parameter '{param_name}' must be an integer between {min_val} and {max_val} (got {parsed})."
+
+    return parsed, None
+
+
 def is_unattended_or_cron(ctx: Any = None) -> bool:
     """Check if the current execution is running inside an unattended or cron session."""
     if ctx is not None and hasattr(ctx, "current_cron_execution") and callable(ctx.current_cron_execution):
@@ -31,24 +57,6 @@ def is_unattended_or_cron(ctx: Any = None) -> bool:
                 return True
         except Exception:
             pass
-
-    try:
-        from cron.execution_identity import current_cron_execution
-        if current_cron_execution() is not None:
-            return True
-    except Exception:
-        pass
-
-    try:
-        from gateway.session_context import get_session_env
-        cron_val = str(get_session_env("HERMES_CRON_SESSION", "")).strip().lower()
-        if cron_val in ("1", "true", "yes", "t", "y"):
-            return True
-        sq_val = str(get_session_env("HERMES_SINGLE_QUERY_SESSION", "")).strip().lower()
-        if sq_val in ("1", "true", "yes", "t", "y"):
-            return True
-    except Exception:
-        pass
 
     cron_env = str(os.environ.get("HERMES_CRON_SESSION", "")).strip().lower()
     if cron_env in ("1", "true", "yes", "t", "y"):
@@ -111,9 +119,14 @@ def handle_device_info(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_read_sms(params: Dict[str, Any], **kwargs) -> str:
     """Read SMS messages from Android device."""
+    raw_limit = params.get("limit", 5)
+    limit, err = _parse_bounded_int(raw_limit, 1, 50, "limit")
+    if err:
+        return json.dumps({"error": err}, indent=2)
+
     bridge = get_bridge()
     payload = {
-        "limit": params.get("limit", 5),
+        "limit": limit,
         "sender": params.get("sender"),
         "query": params.get("query"),
     }
@@ -122,7 +135,7 @@ def handle_read_sms(params: Dict[str, Any], **kwargs) -> str:
         return json.dumps(res.get("data", res), ensure_ascii=False, indent=2)
 
     # Fallback to Termux SMS API if running locally on Termux
-    termux_sms = bridge.exec_adb_command(["shell", "termux-sms-list", "-l", str(params.get("limit", 5))])
+    termux_sms = bridge.exec_adb_command(["shell", "termux-sms-list", "-l", str(limit)])
     if termux_sms.get("success") and termux_sms.get("stdout"):
         return termux_sms["stdout"]
 
@@ -396,8 +409,12 @@ def handle_take_screenshot(params: Dict[str, Any], **kwargs) -> str:
     # 2. Try ADB exec-out screencap
     if bridge.adb_bin:
         try:
+            cmd = [bridge.adb_bin]
+            if bridge.device_id:
+                cmd.extend(["-s", bridge.device_id])
+            cmd.extend(["exec-out", "screencap", "-p"])
             with open(dest, "wb") as f:
-                subprocess.run([bridge.adb_bin, "exec-out", "screencap", "-p"], stdout=f, timeout=10)
+                subprocess.run(cmd, stdout=f, timeout=10, env=get_clean_adb_env())
             if os.path.exists(dest) and os.path.getsize(dest) > 0:
                 return json.dumps({"status": "saved_via_adb", "path": dest, "size_bytes": os.path.getsize(dest)})
         except Exception as e:
@@ -407,29 +424,52 @@ def handle_take_screenshot(params: Dict[str, Any], **kwargs) -> str:
 
 
 def handle_contacts_search(params: Dict[str, Any], **kwargs) -> str:
-    """Search address book contacts safely without SQL/query injection."""
+    """Search address book contacts safely without SQL or shell command injection."""
     raw_query = params.get("query", "")
-    query = str(raw_query) if raw_query is not None else ""
-    raw_limit = params.get("limit", 10)
-    try:
-        limit = int(raw_limit)
-    except (ValueError, TypeError):
-        limit = 10
-    bridge = get_bridge()
-
-    # Reject quotes and dangerous SQL injection syntax in query clause (Finding #7)
-    if any(char in query for char in ("'", '"', ";", "\\")) or "--" in query or "/*" in query or "*/" in query:
+    query = str(raw_query).strip() if raw_query is not None else ""
+    if not query:
         return json.dumps({
             "success": False,
-            "error": "Invalid search query: quotes, semicolons, backslashes, and SQL comment markers are forbidden in contacts search.",
+            "error": "Search query cannot be empty.",
+        })
+    if len(query) > 100:
+        return json.dumps({
+            "success": False,
+            "error": "Search query exceeds maximum length of 100 characters.",
         })
 
+    raw_limit = params.get("limit", 10)
+    limit, limit_err = _parse_bounded_int(raw_limit, 1, 50, "limit")
+    if limit_err:
+        limit = 10  # fallback safely to default for contacts
+
+    bridge = get_bridge()
+
+    # Layer 1: Reject quotes, shell metacharacters, and dangerous SQL injection syntax
+    shell_and_sql_forbidden = (
+        "'", '"', ";", "\\", "$", "`", "|", "&", ">", "<", "\n", "\r",
+        "(", ")", "{", "}", "*", "?", "~", "!", "^"
+    )
+    if any(char in query for char in shell_and_sql_forbidden) or "--" in query or "/*" in query or "*/" in query:
+        return json.dumps({
+            "success": False,
+            "error": "Invalid search query: shell metacharacters, quotes, semicolons, backslashes, and SQL comment markers are forbidden in contacts search.",
+        })
+
+    # Layer 2: SQL keyword rejection
     upper_query = f" {query.upper()} "
     dangerous_keywords = (" UNION ", " SELECT ", " DROP ", " DELETE ", " UPDATE ", " INSERT ", " ALTER ", " EXEC ")
     if any(kw in upper_query for kw in dangerous_keywords):
         return json.dumps({
             "success": False,
             "error": "Invalid search query: SQL statement keywords are forbidden in contacts search.",
+        })
+
+    # Layer 3: Whitelist pattern - allow only Unicode word characters, spaces, and safe punctuation (.-_@+)
+    if not re.match(r"^[\w\s.\-@+]+$", query, re.UNICODE):
+        return json.dumps({
+            "success": False,
+            "error": "Invalid search query: only alphanumeric characters, spaces, and safe punctuation (.-_@+) are permitted.",
         })
 
     safe_query = query.replace("'", "''")
@@ -465,8 +505,20 @@ def handle_media_recent_photos(params: Dict[str, Any], **kwargs) -> str:
 
 def handle_device_logs(params: Dict[str, Any], **kwargs) -> str:
     """Retrieve specialized device logs wirelessly over MQTT or ADB fallback."""
-    buffer = params.get("buffer", "system")
-    lines = params.get("lines", 50)
+    raw_buffer = params.get("buffer", "system")
+    buffer = str(raw_buffer).strip().lower() if raw_buffer is not None else "system"
+    allowed_buffers = {"main", "system", "radio", "crash", "dumpsys"}
+    if buffer not in allowed_buffers:
+        return json.dumps({
+            "success": False,
+            "error": f"Invalid log buffer '{raw_buffer}'. Must be one of: {', '.join(sorted(allowed_buffers))}.",
+        })
+
+    raw_lines = params.get("lines", 50)
+    lines, err = _parse_bounded_int(raw_lines, 1, 2000, "lines")
+    if err:
+        return json.dumps({"success": False, "error": err})
+
     bridge = get_bridge()
 
     res = bridge.send_request("api/v1/device/logs", {"buffer": buffer, "lines": lines})

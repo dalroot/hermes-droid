@@ -105,6 +105,7 @@ Hermes Droid supports two operational modes depending on deployment topology:
 - Out-of-band control via dedicated device topics (`hermes/node/<DEVICE_ID>/cmd`).
 - Companion CLI utility `hdroid` for remote diagnostics, screenshot fetching, and OTA deployments.
 - *Note:* Broker transport on port 1883 operates in plaintext without transport encryption; securing the broker with TLS (port 8883) and per-topic ACLs requires infrastructure-side configuration (see [Security Audit](docs/SECURITY_AUDIT.md)).
+- *Companion App Security Model:* The companion app executes shell commands received on its designated command topic (`hermes/node/<DEVICE_ID>/cmd`). Therefore, broker-level access control (TLS on port 8883, strict per-topic ACLs, and client authentication) serves as the primary enforcement boundary on the mobile device side.
 
 ---
 
